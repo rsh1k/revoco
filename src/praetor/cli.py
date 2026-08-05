@@ -156,6 +156,40 @@ def _cmd_controls(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_bench(args: argparse.Namespace) -> int:
+    from .bench import Harness, all_scenarios, benign, malicious, render, to_dict
+
+    if args.malicious_only:
+        scenarios = malicious()
+    elif args.benign_only:
+        scenarios = benign()
+    else:
+        scenarios = all_scenarios()
+    if args.technique:
+        scenarios = [s for s in scenarios if s.technique in set(args.technique)]
+    if not scenarios:
+        print("no scenarios matched", file=sys.stderr)
+        return 2
+
+    results = Harness().run_all(scenarios)
+    if args.json:
+        print(json.dumps(to_dict(results, include_scenarios=args.verbose), indent=2))
+    else:
+        print(render(results, verbose=args.verbose))
+
+    # Exit non-zero on an *unexpected* loss or any false positive, so this can gate
+    # CI. A scenario whose designed outcome is loss does not fail the build; a
+    # regression that starts losing something new does.
+    from .bench.scenario import Outcome
+
+    bad = [
+        r for r in results
+        if r.outcome in (Outcome.UNCONTAINED, Outcome.FALSE_POSITIVE, Outcome.ERROR)
+        and r.scenario.expect_outcome is not r.outcome
+    ]
+    return 1 if bad else 0
+
+
 def _cmd_surfaces(args: argparse.Namespace) -> int:
     from .adapters import SURFACES, all_specs, gate_catalog, summary
 
@@ -229,6 +263,14 @@ def build_parser() -> argparse.ArgumentParser:
     cv.add_argument("file", help="inverse registry file")
     cv.add_argument("--tools", required=True, help="comma-separated tool names")
     cv.set_defaults(func=_cmd_coverage)
+
+    bn = sub.add_parser("bench", help="run the containment benchmark")
+    bn.add_argument("--verbose", "-v", action="store_true", help="per-step detail")
+    bn.add_argument("--json", action="store_true")
+    bn.add_argument("--technique", action="append", help="restrict to technique code(s)")
+    bn.add_argument("--malicious-only", action="store_true")
+    bn.add_argument("--benign-only", action="store_true")
+    bn.set_defaults(func=_cmd_bench)
 
     sf = sub.add_parser("surfaces", help="what the bundled adapters cover")
     sf.add_argument("--gates", action="store_true", help="list every gate to implement")

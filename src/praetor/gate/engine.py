@@ -74,6 +74,8 @@ class PolicyEngine:
             return False
         if rule.min_threat_score is not None and scan.score < rule.min_threat_score:
             return False
+        if rule.min_risk is not None and risk < rule.min_risk:
+            return False
         if rule.max_risk is not None and risk > rule.max_risk:
             return False
         if not rule.condition.evaluate(args):

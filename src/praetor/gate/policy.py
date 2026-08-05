@@ -77,6 +77,13 @@ class Rule:
     budget: Budget | None = None
     min_threat_score: int | None = None
     max_risk: int | None = None
+    # Lower bound on the caller-assigned risk band. Added because the containment
+    # benchmark showed a reversibility-only escalation rule is too blunt to ship:
+    # sending an email is irreversible AND entirely routine, so "escalate anything
+    # irreversible" sends every notification to a human and the control plane gets
+    # switched off inside a week. Pairing reversibility with a risk floor is what
+    # separates irreversible-and-consequential from irreversible-and-ordinary.
+    min_risk: int | None = None
     reason: str = ""
     obligations: dict[str, Any] = field(default_factory=dict)
 
@@ -98,6 +105,7 @@ class Rule:
             ),
             "min_threat_score": self.min_threat_score,
             "max_risk": self.max_risk,
+            "min_risk": self.min_risk,
             "reason": self.reason,
             "obligations": self.obligations,
         }
@@ -210,6 +218,7 @@ def _parse_rule(raw: dict[str, Any], index: int) -> Rule:
         budget=budget,
         min_threat_score=opt_int("min_threat_score"),
         max_risk=opt_int("max_risk"),
+        min_risk=opt_int("min_risk"),
         reason=str(raw.get("reason", "")),
         obligations=dict(raw.get("obligations", {})),
     )

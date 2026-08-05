@@ -206,7 +206,17 @@ DEVOPS_SPECS: list[InverseSpec] = [
         tool="k8s.resource.delete",
         kind=Reversibility.COMPENSABLE,
         inverse_tool="k8s.resource.apply",
-        arg_map=(("manifest", "snapshot.manifest"),),
+        # namespace and name are passed explicitly even though a manifest carries
+        # them internally. The containment benchmark caught the original
+        # manifest-only version: it assumed the executor would dig identity out of
+        # the manifest, so an executor that expected them as arguments could not
+        # resolve the target at all. An inverse that depends on an implicit
+        # convention is a rollback waiting to fail in an unfamiliar integration.
+        arg_map=(
+            ("namespace", "args.namespace"),
+            ("name", "args.name"),
+            ("manifest", "snapshot.manifest"),
+        ),
         snapshot_fields=("manifest",),
         gates=(GATE_K8S_MANIFEST_CAPTURED, GATE_PVC_RETAINED),
         degraded_kind=Reversibility.IRREVERSIBLE,
