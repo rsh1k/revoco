@@ -1,13 +1,26 @@
-# Revoco
+# Revoco — undo for AI agent actions
 
 [![ci](https://github.com/rsh1k/revoco/actions/workflows/ci.yml/badge.svg)](https://github.com/rsh1k/revoco/actions/workflows/ci.yml)
-[![PyPI](https://img.shields.io/pypi/v/revoco.svg)](https://pypi.org/project/revoco/)
-[![Python](https://img.shields.io/pypi/pyversions/revoco.svg)](https://pypi.org/project/revoco/)
-[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+[![PyPI](https://img.shields.io/pypi/v/revoco)](https://pypi.org/project/revoco/)
+[![Python](https://img.shields.io/pypi/pyversions/revoco)](https://pypi.org/project/revoco/)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
 
-**An action control plane for AI agents.** Delegated authority, per-action policy enforcement, **reversible execution**, and evidence a regulator can verify.
+Agent governance is crowded with tools that answer *was this allowed* and *was this logged*. Almost none answer **can we take it back** — and that's the question that decides whether an incident costs an afternoon or a quarter.
 
-*Revoco* is Latin for **"I call it back."** That is the whole thesis: agent governance is crowded with tools that answer *was this allowed* and *was this logged*, and almost none that answer *can we take it back*. The third question is the one that decides whether an incident costs an afternoon or a quarter.
+When an agent repoints a supplier's bank account or deletes a production Deployment, knowing exactly what happened is necessary and not sufficient. Somebody still has to put it back, by hand, under time pressure, while the auditors watch.
+
+Revoco does four things:
+
+- **Plans the rollback before the action runs** — the only moment prior state still exists. A plan built afterwards can record what changed but not what to restore.
+- **Rolls back a whole compromised grant in one call** — revoke the authority *and* its sub-delegated subtree, then undo everything done under it, newest first.
+- **Proves the rollback still works** — drills each inverse against a disposable canary and compares state, because a backup nobody has restored is a hypothesis.
+- **Produces evidence someone who distrusts you can verify** — one hash-chained ledger over authority, enforcement and reversal.
+
+*Revoco* is Latin for "I call it back."
+
+```bash
+pip install revoco
+```
 
 Revoco merges three earlier tools and adds the layer none of them had:
 
@@ -20,13 +33,9 @@ Revoco merges three earlier tools and adds the layer none of them had:
 
 ---
 
-## The gap this closes
+## Reversibility as an authorization input
 
-Agent governance tooling is overwhelmingly about detection: was this call allowed, was it logged, was it anomalous. That leaves the expensive half of an incident untouched.
-
-When an agent has already repointed a supplier's bank account and paid an invoice into it, knowing exactly what happened is necessary and not sufficient. Somebody still has to put it back — by hand, under time pressure, while the auditors watch. Reversibility is not a recovery procedure you write afterwards. By then the prior state is gone.
-
-So Revoco treats reversibility as **a property of the action, declared and planned before the action runs**, and as a **first-class authorization input**:
+Reversibility isn't a recovery procedure you write afterwards — by then the prior state is gone. So Revoco treats it as a property of the action, declared before the action runs, which makes it available to the thing that decides whether the action happens at all:
 
 ```yaml
 - id: no-undo-needs-a-human
@@ -41,11 +50,7 @@ Enforcement stops being only *"may this agent do it?"* and becomes also *"and ca
 
 ## Quick start
 
-```bash
-pip install revoco
-```
-
-Or from source:
+Installed above, or from source:
 
 ```bash
 git clone https://github.com/rsh1k/revoco.git
@@ -267,7 +272,8 @@ lists the sequenced undos, the one-shot specs, and every gate your `GateEvaluato
 
 This is a **working foundation**, published so it can be read, run, and extended. It is not a finished or certified product.
 
-- **The inverse registries are specifications, not validated integrations.** `ap_starter_registry()` is illustrative; the SAP and Workday registries were written from vendor documentation and KBAs and have **never been executed against a live system**. Argument names differ across S/4HANA Cloud, on-premise releases, and your middleware; Workday business process configuration is per-tenant. **A tool mapped to the wrong inverse will produce a confident, wrong rollback** — worse than no rollback. Work through the validation checklist in [docs/ADAPTERS.md](docs/ADAPTERS.md) before any of it governs a real write, and re-validate after every ERP upgrade: a changed API contract turns a correct spec into a wrong one and nothing here can detect that for you.
+- **One adapter surface is validated; seven are specifications.** `workstation` (14 specs) is drilled against a real filesystem and a real git repo by `scripts/validate_workstation.py`, in CI — 11 of 11 drillable inverses restore state, 10 prose claims probed. **The other seven have never been executed against a live system.** They were written from vendor documentation and KBAs; argument names differ across S/4HANA Cloud, on-premise releases and your middleware, and Workday business process configuration is per-tenant. **A tool mapped to the wrong inverse produces a confident, wrong rollback** — worse than none. Work through the checklist in [docs/ADAPTERS.md](docs/ADAPTERS.md) first, and re-validate after every ERP upgrade. Validating the one cheap surface found five defects that would all have recurred elsewhere, which is the argument for doing it before you touch a vendor sandbox — and a scheduled drill is the only thing that catches a spec going stale after an upgrade.
+- **`ap_starter_registry()` is illustrative**, not a starting point for production. It exists so the demo and the quick start have something to run against.
 - **A `const:` value in a spec is a placeholder.** The SAP specs default `ReversalReason` to `01`, which as delivered permits only the original posting date. Use the reason your finance team configured.
 - **Compensating actions are not inverses.** You can void a payment; you cannot recall the remittance advice already sent. `Reversibility.COMPENSABLE` requires you to name the `residue` — what survives the undo — because an unnamed side effect is an unowned risk.
 - **A policy engine's false-positive rate is a property of the policies you write**, not of the engine. A flawless engine still blocks a legitimate call if a rule is too broad. The goal is an engine you can reason about and test exhaustively.
@@ -275,6 +281,7 @@ This is a **working foundation**, published so it can be read, run, and extended
 - **Intent-drift detection is lexical overlap.** It flags divergence; it does not establish intent.
 - **A hash chain does not detect truncation.** Edits, reorders, and interior deletions break verification; dropping the most recent entries leaves a valid prefix. Anchor the head hash externally — `Ledger.checkpoint()` gives you the value to publish.
 - **In-memory stores are single-process.** `InMemorySessionStore.would_exceed` followed by `commit` is not atomic, so two concurrent calls can both pass a check only one should. A shared store must make that pair atomic.
+- **Nothing persists yet.** The ledger, the reversal journal, and the drill register are all in memory, so they reset on restart. Three consequences worth knowing: the horizon forgets undo windows that are still open, `RecoverabilityRegister`'s freshness window means nothing across deploys, and a restart loses the evidence chain rather than breaking it — which is a different failure from tampering and currently indistinguishable from it. Persisting the ledger needs WAL with `synchronous=FULL` and append-only enforced by triggers (SQLite has no `GRANT`), the ledger append and journal write in one transaction, and a startup grace period so a long outage does not mass-degrade every proof to `IRREVERSIBLE` and block legitimate work.
 - **Control mappings are a self-assessment aid, not a certification** or a legal opinion. NIST AI RMF is voluntary; EU AI Act conformity is assessed against a quality-management system of which logging is one clause.
 
 Every place needing production hardening is marked `# HARDENING:` in the source. Search for it before deploying.
@@ -302,6 +309,8 @@ ASI04 (supply chain) and ASI05 (unexpected code execution) are deliberately left
 ## CLI
 
 ```bash
+revoco bench                                    # the containment benchmark
+revoco surfaces --gates                         # what the adapters cover, and every gate to implement
 revoco policy-check   policy.yaml               # validate a policy, warn on risky defaults
 revoco inverses-check inverses.yaml             # validate an inverse registry
 revoco coverage       inverses.yaml --tools a,b # rollback readiness for a tool surface
@@ -309,7 +318,17 @@ revoco controls                                 # print the control mapping
 revoco demo                                     # end-to-end AP fraud scenario
 ```
 
-`coverage` exits non-zero when tools have no declared inverse, so it works as a CI gate: adding a write operation without classifying its undo path fails the build.
+Plus one script, because it needs a real filesystem rather than a package entry point:
+
+```bash
+python scripts/validate_workstation.py          # drill the workstation adapter for real
+```
+
+**Three of these are CI gates**, and each encodes a rule the package makes about itself:
+
+- `bench` exits non-zero on an unexpected loss or any false positive. A scenario whose designed outcome is loss doesn't fail the build; a regression that starts losing something new does.
+- `coverage` exits non-zero when a tool has no declared inverse — so adding a write operation without classifying its undo path fails the build.
+- `inverses-check` exits non-zero when a spec reads `snapshot.X` without declaring `X`, which is the easiest way to author a phantom rollback.
 
 ---
 
@@ -320,13 +339,23 @@ src/revoco/
   core/            crypto (Ed25519, SHA-256, RFC-8785 canonical JSON), ids, errors
   authority/       principals · scope · delegation · revocation · chain reconstruction
   gate/            policy · conditions · threat scanner · session budgets · PDP
-  reversal/        model · inverse registry · reversal engine        <- new
-  adapters/        SAP + Workday inverse specs (see docs/ADAPTERS.md) <- new
+  reversal/        model · registry · engine · budget · horizon
+  adapters/        91 inverse specs across 8 surfaces (docs/ADAPTERS.md)
+  bench/           containment benchmark: world · scenarios · harness · corpus · report
+  drills.py        recovery drills, proof-gated classification, attestations
   ledger.py        one append-only hash-chained ledger
   detect.py        OWASP ASI + PRA01/PRA02 detectors
   controlplane.py  the orchestrator
   evidence.py      evidence packs + readiness reports
   demo.py          runnable AP-fraud scenario
+
+scripts/
+  validate_workstation.py   drills the workstation adapter against real fs + git
+  bump_version.py           used by the release workflow
+
+docs/
+  ADAPTERS.md      per-spec semantics, citations, validation checklist
+  RELEASING.md     the release path, and how to schedule drills
 ```
 
 **One ledger, not three.** Each merged tool had its own hash-chained log. Three chains cannot be verified as one history: an attacker who altered a policy decision in one and the matching action record in another breaks both independently, and nothing could prove the two logs described the same event. A single chain over authority, enforcement, and reversal makes "what happened, in what order, under whose authority" one verifiable question.

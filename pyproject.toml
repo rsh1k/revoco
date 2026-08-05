@@ -5,14 +5,16 @@ build-backend = "hatchling.build"
 [project]
 name = "revoco"
 version = "0.2.1"
-description = "An action control plane for AI agents: delegated authority, per-action policy enforcement, reversible execution, and regulator-grade evidence."
+description = "Undo for AI agent actions. Plans the rollback before the action runs, proves it still works, and rolls back a compromised grant's whole blast radius in one call."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "Apache-2.0" }
 authors = [{ name = "rsh1k" }]
 keywords = [
-    "ai-security", "ai-agents", "agentic-ai", "governance", "audit",
-    "owasp", "nist", "eu-ai-act", "sox", "mcp", "rollback",
+    "ai-agents", "agentic-ai", "ai-security", "rollback", "undo",
+    "reversibility", "compensating-transaction", "agent-governance",
+    "audit-trail", "tamper-evident", "mcp", "guardrails",
+    "owasp", "nist", "eu-ai-act", "sox", "sr-11-7",
 ]
 classifiers = [
     "Development Status :: 3 - Alpha",
