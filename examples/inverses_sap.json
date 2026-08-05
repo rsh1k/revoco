@@ -129,7 +129,7 @@
         "IBAN"
       ],
       "static_args": {
-        "_praetor_reason": "restore prior banking details"
+        "_revoco_reason": "restore prior banking details"
       },
       "steps": [],
       "tool": "sap.supplier.bank.update",

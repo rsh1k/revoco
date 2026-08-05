@@ -1,0 +1,147 @@
+name: release
+
+# Push source to main and a new version lands on PyPI. Nothing else to remember.
+#
+# Guards, because "publish on every push" is a bad idea unguarded:
+#   * tests must pass first — the publish job needs the test job
+#   * docs-only changes do not cut a release (see paths below)
+#   * `[skip release]` anywhere in the commit message skips it
+#   * a version already on PyPI is never republished (PyPI versions are immutable,
+#     so a re-run must be a no-op rather than a hard failure)
+#   * the bump commit pushed by this workflow uses GITHUB_TOKEN, and pushes made
+#     with GITHUB_TOKEN do not trigger workflows — that is what stops the loop.
+#     The `[skip release]` marker on that commit is a second belt.
+#
+# Bump level: `[major]` or `[minor]` in the commit message, otherwise patch.
+# Or run it by hand from the Actions tab and pick the level.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src/**"
+      - "tests/**"
+      - "examples/**"
+      - "pyproject.toml"
+      - ".github/workflows/release.yml"
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: "Version bump level"
+        required: true
+        default: patch
+        type: choice
+        options: [patch, minor, major]
+
+# Serialize releases. Two concurrent runs would race on the version number and one
+# would try to publish a version the other already took.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  test:
+    if: "!contains(github.event.head_commit.message, '[skip release]')"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv sync --extra dev --extra yaml
+      - run: uv run ruff check src tests scripts
+      - run: uv run mypy src/revoco --ignore-missing-imports
+      - run: uv run pytest tests -q
+      - run: uv run revoco bench
+      - run: uv run python -m revoco.demo
+
+  release:
+    needs: test
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      contents: write   # push the version bump and the tag
+      id-token: write   # OIDC for PyPI Trusted Publishing — no API token anywhere
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: astral-sh/setup-uv@v5
+
+      - name: Decide bump level
+        id: level
+        env:
+          MSG: ${{ github.event.head_commit.message }}
+        run: |
+          if [ -n "${{ inputs.bump }}" ]; then
+            LEVEL="${{ inputs.bump }}"
+          elif printf '%s' "$MSG" | grep -qi '\[major\]'; then
+            LEVEL=major
+          elif printf '%s' "$MSG" | grep -qi '\[minor\]'; then
+            LEVEL=minor
+          else
+            LEVEL=patch
+          fi
+          echo "level=$LEVEL" >> "$GITHUB_OUTPUT"
+          echo "Bumping: $LEVEL"
+
+      - name: Bump version
+        id: bump
+        run: |
+          NEW=$(python3 scripts/bump_version.py "${{ steps.level.outputs.level }}")
+          echo "version=$NEW" >> "$GITHUB_OUTPUT"
+          echo "New version: $NEW"
+
+      - name: Check PyPI does not already have this version
+        id: exists
+        run: |
+          NAME=$(python3 -c "import tomllib,pathlib;print(tomllib.loads(pathlib.Path('pyproject.toml').read_text())['project']['name'])")
+          echo "name=$NAME" >> "$GITHUB_OUTPUT"
+          CODE=$(curl -s -o /dev/null -w '%{http_code}' \
+            "https://pypi.org/pypi/$NAME/${{ steps.bump.outputs.version }}/json")
+          if [ "$CODE" = "200" ]; then
+            echo "already=true" >> "$GITHUB_OUTPUT"
+            echo "::warning::$NAME ${{ steps.bump.outputs.version }} is already on PyPI; skipping publish"
+          else
+            echo "already=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build
+        if: steps.exists.outputs.already == 'false'
+        run: uv build
+
+      - name: Validate metadata
+        if: steps.exists.outputs.already == 'false'
+        run: uvx twine check dist/*
+
+      - name: Commit and tag the bump
+        if: steps.exists.outputs.already == 'false'
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add pyproject.toml
+          # [skip release] on this commit is belt-and-braces: GITHUB_TOKEN pushes do
+          # not trigger workflows, so the loop is already broken without it.
+          git commit -m "Release v${{ steps.bump.outputs.version }} [skip release]"
+          git tag -a "v${{ steps.bump.outputs.version }}" \
+            -m "v${{ steps.bump.outputs.version }}"
+          git push origin HEAD:main --follow-tags
+
+      - name: Publish to PyPI
+        if: steps.exists.outputs.already == 'false'
+        uses: pypa/gh-action-pypi-publish@release/v1
+        # No `password:` — Trusted Publishing authenticates with the OIDC token
+        # granted by `id-token: write` above. Requires a one-time publisher
+        # configured on PyPI; see docs/RELEASING.md.
+
+      - name: GitHub release
+        if: steps.exists.outputs.already == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "v${{ steps.bump.outputs.version }}" \
+            --title "v${{ steps.bump.outputs.version }}" \
+            --generate-notes \
+            dist/*

@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import json
 
-from praetor.cli import main
-from praetor.demo import run_demo
+from revoco.cli import main
+from revoco.demo import run_demo
 
 
 def test_demo_ends_with_the_fraud_undone(capsys):
@@ -44,7 +44,7 @@ def test_cli_controls_json(capsys):
 
 
 def test_cli_policy_check_accepts_the_starter_policy(tmp_path, capsys):
-    from praetor.gate.policy import STARTER_POLICY
+    from revoco.gate.policy import STARTER_POLICY
 
     p = tmp_path / "policy.json"
     p.write_text(json.dumps(STARTER_POLICY))
@@ -66,7 +66,7 @@ def test_cli_policy_check_warns_on_a_permissive_default(tmp_path, capsys):
 
 
 def test_cli_coverage_fails_when_a_tool_has_no_declared_inverse(tmp_path, capsys):
-    from praetor.reversal.registry import ap_starter_registry
+    from revoco.reversal.registry import ap_starter_registry
 
     f = tmp_path / "inv.json"
     f.write_text(json.dumps(ap_starter_registry().to_dict()))
@@ -76,7 +76,7 @@ def test_cli_coverage_fails_when_a_tool_has_no_declared_inverse(tmp_path, capsys
 
 
 def test_cli_inverses_check_round_trips_the_starter_registry(tmp_path, capsys):
-    from praetor.reversal.registry import ap_starter_registry
+    from revoco.reversal.registry import ap_starter_registry
 
     f = tmp_path / "inv.json"
     f.write_text(json.dumps(ap_starter_registry().to_dict()))

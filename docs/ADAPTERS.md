@@ -2,12 +2,12 @@
 
 **Status: specification, not a validated integration.**
 
-Everything else in Praetor is transferable across customers. This is not. Knowing that an SAP payment reversal is a three-step ordered sequence, that a Workday rescind dies the moment payroll runs, or that an S3 delete is recoverable only if someone enabled versioning first, is per-system knowledge that has to be built once and maintained forever. It is also the moat — capital cannot shortcut it, and a horizontal identity vendor will not do it.
+Everything else in Revoco is transferable across customers. This is not. Knowing that an SAP payment reversal is a three-step ordered sequence, that a Workday rescind dies the moment payroll runs, or that an S3 delete is recoverable only if someone enabled versioning first, is per-system knowledge that has to be built once and maintained forever. It is also the moat — capital cannot shortcut it, and a horizontal identity vendor will not do it.
 
 These specs were written from vendor documentation, Knowledge Base Articles, and customer-published administration guides. **They have not been executed against a live system.** Work through the validation checklist at the end before any of this governs a real write. A tool mapped to the wrong inverse produces a confident, wrong rollback — worse than having no rollback at all.
 
 ```bash
-praetor surfaces --gates     # what is covered, and every gate you must implement
+revoco surfaces --gates     # what is covered, and every gate you must implement
 ```
 
 ## Coverage
@@ -25,7 +25,7 @@ praetor surfaces --gates     # what is covered, and every gate you must implemen
 | `saas` | 12 | Salesforce records, Slack messages, Stripe payments |
 | `workstation` | 14 | Filesystem, git, shell — what coding agents actually touch |
 
-Two numbers from `praetor surfaces` are worth reporting upward:
+Two numbers from `revoco surfaces` are worth reporting upward:
 
 - **39 of 91 specs are recoverable *only* because prior state is captured before the write.** That is the share of the undo surface this architecture creates rather than merely records. A deleted Kubernetes object, a deleted git branch, a force-pushed ref, an overwritten file, a revoked security-group rule, a repointed vendor bank account — none has a native undo.
 - **12 specs can turn out irreversible for a particular target** despite an optimistic classification. An unchecked authorize-phase gate on any of them is a phantom rollback waiting to happen.
@@ -80,7 +80,7 @@ It is also the case where SAP's own audit trail may not be enough to recover fro
 - Updates to vendor master bank data have been reported missing from change logs entirely — [KBA 2518878](https://userapps.support.sap.com/sap/support/knowledge/en/2518878)
 - Sensitive fields configured for dual control have been reported not displaying supplier bank account changes — [KBA 3716628](https://userapps.support.sap.com/sap/support/knowledge/en/3716628)
 
-**This is the strongest available argument for the whole architecture.** If the prior bank account cannot be reliably read back out of `CDHDR`/`CDPOS` after the fact, then capturing it before the write is not a nice-to-have — it is the only place the value exists. Praetor's snapshot happens pre-write by construction.
+**This is the strongest available argument for the whole architecture.** If the prior bank account cannot be reliably read back out of `CDHDR`/`CDPOS` after the fact, then capturing it before the write is not a nice-to-have — it is the only place the value exists. Revoco's snapshot happens pre-write by construction.
 
 Normally the prior value would come from `CDHDR`/`CDPOS`: query `CDHDR` where `OBJECTCLAS = 'BUPA_BUP'`, `OBJECTID` = the supplier, `CHANGE_IND = 'U'`, then `CDPOS` on the change number for `VALUE_OLD`/`VALUE_NEW` ([SAP Community](https://community.sap.com/t5/enterprise-resource-planning-q-a/dates-when-vendor-bank-details-updated/qaq-p/12023580), [KBA 3683201](https://userapps.support.sap.com/sap/support/knowledge/en/3683201)). Relevant fields are `LFBK-BANKS` (country), `LFBK-BANKL` (bank key), `LFBK-BANKN` (account). Treat that path as a cross-check, not the source of truth.
 
@@ -107,7 +107,7 @@ A reversal document cannot be reversed again; correcting a mistaken reversal nee
 - **Journal entries:** `Journal Entry – Reverse` inbound service ([SAP Help Portal](https://help.sap.com/docs/SAP_S4HANA_CLOUD/b978f98fc5884ff2aeb10c8fdeb8a43b/57b40036b71f4825adad70a0a5b91573.html)); posting via synchronous/asynchronous SOAP services; `I_JournalEntryTP` exposes Post/Validate/Reverse/Change ([APIs for Journal Entries collection](https://community.sap.com/t5/technology-blog-posts-by-sap/apis-for-journal-entries-the-collection-updated-july-2025/ba-p/13565258)).
 - **Supplier master:** `API_BUSINESS_PARTNER` OData, full CRUD plus deep insert, with `A_SupplierBank` for bank details ([KBA 3569467](https://userapps.support.sap.com/sap/support/knowledge/en/3569467), [SAP Help Portal](https://help.sap.com/docs/SAP_S4HANA_ON-PREMISE/44e06f22436c43e582db6ccd5250e29b/85043858ea0f9244e10000000a4450e5.html)).
 
-Note that reads of bank and identification data through `API_BUSINESS_PARTNER` are subject to Read Access Logging. Praetor's `state_reader` will generate RAL entries — expected, but tell whoever owns that log before you turn it on.
+Note that reads of bank and identification data through `API_BUSINESS_PARTNER` are subject to Read Access Logging. Revoco's `state_reader` will generate RAL entries — expected, but tell whoever owns that log before you turn it on.
 
 ### The cheapest win in this whole document
 
@@ -127,7 +127,7 @@ Note that reads of bank and identification data through `API_BUSINESS_PARTNER` a
 
 Sources: [Texas A&M — Correct, Cancel and Rescind](https://it.tamus.edu/workdayservices/training/reference_guide/correct-cancel-and-rescind/), [UT Austin — Cancel or Rescind?](https://workday.utexas.edu/help/mistakes-happen), [Workday Finance blog](https://americasworkdayfinance.blogspot.com/2020/04/business-process-rescind-vs-cancel.html).
 
-Because Praetor commits a journal entry only after the forward action has completed, **Rescind is the inverse that matters.** Cancel applies to a window this package does not model — a process still awaiting approval has not yet changed anything to undo. Rescind requires a security group with permission, typically Business Process Administrator, and the action cannot be undone.
+Because Revoco commits a journal entry only after the forward action has completed, **Rescind is the inverse that matters.** Cancel applies to a window this package does not model — a process still awaiting approval has not yet changed anything to undo. Rescind requires a security group with permission, typically Business Process Administrator, and the action cannot be undone.
 
 ### Spec table
 
@@ -265,7 +265,7 @@ Do not skip this. The specs are a starting shape, not verified truth.
 6. Argument names differ between S/4HANA Cloud, on-premise releases, and whatever your middleware renames them to. Diff the specs against your own API contract.
 7. Confirm which reversal reasons your finance team has configured and what posting-date rule each carries. Replace the `const:01` placeholders.
 8. Confirm which Workday business processes expose Rescind **in your tenant**, and to which security groups. Business process configuration is per-tenant.
-9. Run `praetor coverage <registry> --tools <your real tool list>` and drive the unclassified count to zero. It exits non-zero, so wire it into CI: adding a write operation without classifying its undo path should fail the build.
+9. Run `revoco coverage <registry> --tools <your real tool list>` and drive the unclassified count to zero. It exits non-zero, so wire it into CI: adding a write operation without classifying its undo path should fail the build.
 
 **Ongoing:**
 10. Re-validate after every ERP upgrade. A changed API contract turns a correct spec into a confident, wrong rollback, and nothing in this package can detect that for you.
@@ -275,8 +275,8 @@ Do not skip this. The specs are a starting shape, not verified truth.
 ## Using them
 
 ```python
-from praetor import ControlPlane
-from praetor.adapters import registry_for
+from revoco import ControlPlane
+from revoco.adapters import registry_for
 
 def gate_evaluator(ctx):
     # ctx.phase is "authorize" (before the write, ctx.entry is None) or "undo".

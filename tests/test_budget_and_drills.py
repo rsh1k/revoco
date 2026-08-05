@@ -8,11 +8,11 @@ from __future__ import annotations
 
 import pytest
 
-from praetor import ControlPlane, Scope, crypto
-from praetor.bench import Harness
-from praetor.bench.corpus import _MALICIOUS
-from praetor.bench.world import VERB_UPDATE, ToolBinding, World
-from praetor.drills import (
+from revoco import ControlPlane, Scope, crypto
+from revoco.bench import Harness
+from revoco.bench.corpus import _MALICIOUS
+from revoco.bench.world import VERB_UPDATE, ToolBinding, World
+from revoco.drills import (
     Canary,
     DrillOutcome,
     DrillRunner,
@@ -20,9 +20,9 @@ from praetor.drills import (
     attest,
     render_report,
 )
-from praetor.gate.policy import load_policy
-from praetor.reversal import InverseRegistry, InverseSpec, Reversibility
-from praetor.reversal.budget import IrreversibilityBudget
+from revoco.gate.policy import load_policy
+from revoco.reversal import InverseRegistry, InverseSpec, Reversibility
+from revoco.reversal.budget import IrreversibilityBudget
 
 # ---------------------------------------------------------------------------
 # Irreversibility budget
@@ -295,7 +295,7 @@ def test_an_undrilled_tool_keeps_its_declared_posture():
 
 def test_the_hook_can_never_upgrade_a_posture():
     """A hook that could raise a posture would manufacture recoverability."""
-    from praetor.reversal.engine import ReversalEngine
+    from revoco.reversal.engine import ReversalEngine
 
     eng = ReversalEngine(
         InverseRegistry([InverseSpec(tool="x.go", kind=Reversibility.IRREVERSIBLE)]),
@@ -305,7 +305,7 @@ def test_the_hook_can_never_upgrade_a_posture():
 
 
 def test_an_exploding_hook_leaves_the_declared_posture_alone():
-    from praetor.reversal.engine import ReversalEngine
+    from revoco.reversal.engine import ReversalEngine
 
     def boom(tool, kind):
         raise RuntimeError("register unreachable")
@@ -369,7 +369,7 @@ def test_an_attestation_states_when_the_inverse_was_last_proven_and_verifies():
         action_id="act_1", tool="vendor.update_bank",
         reversibility=Reversibility.REVERSIBLE,
         plan_digest="d" * 64, plan_complete=True, register=reg,
-        attestor_private_key=priv, attestor_id="praetor-1", now=4600.0,
+        attestor_private_key=priv, attestor_id="revoco-1", now=4600.0,
     )
     assert att.proven
     assert att.proof_age_seconds == pytest.approx(3600.0)
@@ -384,7 +384,7 @@ def test_an_attestation_admits_when_there_is_no_fresh_proof():
         action_id="act_2", tool="vendor.update_bank",
         reversibility=Reversibility.REVERSIBLE,
         plan_digest="e" * 64, plan_complete=True, register=RecoverabilityRegister(),
-        attestor_private_key=priv, attestor_id="praetor-1", now=100.0,
+        attestor_private_key=priv, attestor_id="revoco-1", now=100.0,
     )
     assert not att.proven
     assert "had NOT been proven working" in att.statement
@@ -395,7 +395,7 @@ def test_an_attestation_for_an_irreversible_action_says_so_plainly():
     att = attest(
         action_id="act_3", tool="wire.send", reversibility=Reversibility.IRREVERSIBLE,
         plan_digest="0" * 64, plan_complete=False, register=None,
-        attestor_private_key=priv, attestor_id="praetor-1",
+        attestor_private_key=priv, attestor_id="revoco-1",
     )
     assert "no rollback path existed, and this was known before it ran" in att.statement
 
@@ -408,7 +408,7 @@ def test_tampering_with_an_attestation_breaks_its_signature():
         action_id="act_4", tool="vendor.update_bank",
         reversibility=Reversibility.REVERSIBLE, plan_digest="f" * 64,
         plan_complete=True, register=None,
-        attestor_private_key=priv, attestor_id="praetor-1",
+        attestor_private_key=priv, attestor_id="revoco-1",
     )
     assert att.verify_signature(pub)
     forged = dataclasses.replace(att, proven=True, proof_age_seconds=1.0)

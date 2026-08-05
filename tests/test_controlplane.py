@@ -4,16 +4,16 @@ from __future__ import annotations
 
 import pytest
 
-from praetor import ControlPlane, Scope, crypto
-from praetor.controlplane import (
+from revoco import ControlPlane, Scope, crypto
+from revoco.controlplane import (
     STAGE_ALLOWED,
     STAGE_AUTHORITY,
     STAGE_DETECT,
     STAGE_ENFORCE,
 )
-from praetor.evidence import build_evidence_pack, readiness_report
-from praetor.gate import Effect, load_policy
-from praetor.reversal import InverseRegistry, InverseSpec, Reversibility, ap_starter_registry
+from revoco.evidence import build_evidence_pack, readiness_report
+from revoco.gate import Effect, load_policy
+from revoco.reversal import InverseRegistry, InverseSpec, Reversibility, ap_starter_registry
 
 PERMISSIVE = {
     "name": "test-permissive",
@@ -211,7 +211,7 @@ def test_a_blocked_attempt_is_still_recorded_as_evidence():
 
 
 def test_unknown_delegation_raises_rather_than_silently_denying():
-    from praetor.core.errors import ChainBroken
+    from revoco.core.errors import ChainBroken
 
     cp, _store, bot, a_priv, _grant, _c, _h = build()
     with pytest.raises(ChainBroken):

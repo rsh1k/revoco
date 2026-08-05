@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "praetor-controlplane"
+name = "revoco"
 version = "0.1.0"
 description = "An action control plane for AI agents: delegated authority, per-action policy enforcement, reversible execution, and regulator-grade evidence."
 readme = "README.md"
@@ -35,14 +35,14 @@ api = ["fastapi>=0.110", "uvicorn>=0.29"]
 dev = ["pytest>=8.0", "pyyaml>=6.0", "ruff>=0.5", "mypy>=1.10"]
 
 [project.scripts]
-praetor = "praetor.cli:main"
+revoco = "revoco.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/rsh1k/praetor"
-Source = "https://github.com/rsh1k/praetor"
+Homepage = "https://github.com/rsh1k/revoco"
+Source = "https://github.com/rsh1k/revoco"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/praetor"]
+packages = ["src/revoco"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

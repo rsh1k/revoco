@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from praetor.core import crypto
-from praetor.core.errors import ValidationError
+from revoco.core import crypto
+from revoco.core.errors import ValidationError
 
 
 def test_sign_and_verify_round_trip():
@@ -72,7 +72,7 @@ def test_malformed_key_material_raises_validation_error():
 
 
 def test_ids_are_prefixed_and_unique():
-    from praetor.core import ids
+    from revoco.core import ids
 
     made = {ids.new_id("act") for _ in range(1000)}
     assert len(made) == 1000

@@ -6,10 +6,10 @@ import time
 
 import pytest
 
-from praetor.authority import AuthorityEngine, Scope
-from praetor.core import crypto
-from praetor.core.errors import ExpiredGrant, ScopeViolation, ValidationError
-from praetor.reversal.model import Reversibility
+from revoco.authority import AuthorityEngine, Scope
+from revoco.core import crypto
+from revoco.core.errors import ExpiredGrant, ScopeViolation, ValidationError
+from revoco.reversal.model import Reversibility
 
 
 @pytest.fixture
@@ -304,7 +304,7 @@ def test_descendant_delegations_returns_the_whole_subtree(party):
 
 
 def test_principal_cannot_be_re_registered_with_a_different_key(party):
-    from praetor.authority.principals import Principal, PrincipalKind
+    from revoco.authority.principals import Principal, PrincipalKind
 
     eng = party["eng"]
     _other_priv, other_pub = crypto.generate_keypair()

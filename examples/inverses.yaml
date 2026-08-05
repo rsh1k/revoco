@@ -5,8 +5,8 @@
 # system of record, and getting one wrong produces a confident, wrong rollback —
 # worse than having none. Validate against your own system before production.
 #
-#   praetor inverses-check examples/inverses.yaml
-#   praetor coverage examples/inverses.yaml --tools invoices.pay,vendors.update
+#   revoco inverses-check examples/inverses.yaml
+#   revoco coverage examples/inverses.yaml --tools invoices.pay,vendors.update
 #
 # Argument sources for arg_map:
 #   args.<path>      from the forward call's arguments
@@ -50,7 +50,7 @@ specs:
     arg_map:
       payment_id: result.payment_id
       invoice_id: args.invoice_id
-      reason: "const:reversed by praetor control plane"
+      reason: "const:reversed by revoco control plane"
     residue: >-
       The remittance advice already sent to the supplier is not recalled, and the
       payment appears as a void rather than an absence on the bank statement.

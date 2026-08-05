@@ -4,14 +4,14 @@ from __future__ import annotations
 
 import pytest
 
-from praetor.core.errors import (
+from revoco.core.errors import (
     AlreadyReversed,
     NotReversible,
     ReversalPlanMissing,
     ReversalWindowExpired,
     ValidationError,
 )
-from praetor.reversal import (
+from revoco.reversal import (
     InverseRegistry,
     InverseSpec,
     JournalState,

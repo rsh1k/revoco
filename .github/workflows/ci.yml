@@ -1,0 +1,88 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.10", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Set up Python ${{ matrix.python }}
+        run: uv python install ${{ matrix.python }}
+
+      - name: Install
+        run: uv sync --extra dev --extra yaml --python ${{ matrix.python }}
+
+      - name: Lint
+        run: uv run ruff check src tests scripts
+
+      - name: Type-check
+        run: uv run mypy src/revoco --ignore-missing-imports
+
+      - name: Tests
+        run: uv run pytest tests -q
+
+      # Ship-blocking checks. Each of these encodes a rule the package makes about
+      # itself, so a change that quietly breaks one should not reach main.
+      - name: Adapter registries are valid
+        run: |
+          for f in examples/inverses_*.json; do
+            echo "== $f"
+            uv run revoco inverses-check "$f"
+          done
+
+      - name: Starter policy is valid
+        run: uv run revoco policy-check examples/policy.yaml
+
+      - name: Containment benchmark
+        # Exits non-zero on an unexpected loss or any false positive. A scenario
+        # whose designed outcome is loss does not fail the build; a regression that
+        # starts losing something new does.
+        run: uv run revoco bench
+
+      - name: End-to-end demo
+        run: uv run python -m revoco.demo
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+
+      - name: Build sdist and wheel
+        run: uv build
+
+      - name: Validate package metadata
+        run: uvx twine check dist/*
+
+      # A wheel that imports in the repo root but not from a clean install is the
+      # classic packaging failure, and it is invisible until someone pip-installs it.
+      - name: Install the wheel somewhere clean and use it
+        run: |
+          uv venv /tmp/fresh
+          uv pip install --python /tmp/fresh/bin/python dist/*.whl
+          /tmp/fresh/bin/revoco surfaces
+          /tmp/fresh/bin/python -c "import revoco; print('version', revoco.__version__)"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/

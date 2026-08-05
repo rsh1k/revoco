@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import pytest
 
-from praetor.bench import (
+from revoco.bench import (
     TECHNIQUES,
     GrantSpec,
     Harness,
@@ -28,9 +28,9 @@ from praetor.bench import (
     score,
     to_dict,
 )
-from praetor.bench.corpus import MULE_BANK, REAL_BANK, erp_world
-from praetor.bench.world import VERB_DELETE, VERB_UPDATE, WorldError
-from praetor.reversal import InverseRegistry, InverseSpec, Reversibility
+from revoco.bench.corpus import MULE_BANK, REAL_BANK, erp_world
+from revoco.bench.world import VERB_DELETE, VERB_UPDATE, WorldError
+from revoco.reversal import InverseRegistry, InverseSpec, Reversibility
 
 # ---------------------------------------------------------------------------
 # Corpus hygiene

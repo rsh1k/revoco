@@ -9,17 +9,17 @@ from __future__ import annotations
 
 import pytest
 
-from praetor import ControlPlane, Scope, crypto
-from praetor.adapters import (
+from revoco import ControlPlane, Scope, crypto
+from revoco.adapters import (
     SURFACES,
     all_specs,
     gate_catalog,
     registry_for,
     summary,
 )
-from praetor.gate import load_policy
-from praetor.reversal import InverseSpec, Reversibility
-from praetor.reversal.model import PHASE_AUTHORIZE
+from revoco.gate import load_policy
+from revoco.reversal import InverseSpec, Reversibility
+from revoco.reversal.model import PHASE_AUTHORIZE
 
 REVERSIBILITY_FIRST = {
     "name": "test-reversibility-first",

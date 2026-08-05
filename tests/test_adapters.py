@@ -9,18 +9,18 @@ from __future__ import annotations
 
 import pytest
 
-from praetor.adapters import sap_registry, workday_registry
-from praetor.adapters.sap import GATE_PERIOD_OPEN, SAP_SPECS
-from praetor.adapters.workday import GATE_PAYROLL_NOT_RUN, WORKDAY_SPECS
-from praetor.core.errors import ReversalGateClosed, ValidationError
-from praetor.reversal import (
+from revoco.adapters import sap_registry, workday_registry
+from revoco.adapters.sap import GATE_PERIOD_OPEN, SAP_SPECS
+from revoco.adapters.workday import GATE_PAYROLL_NOT_RUN, WORKDAY_SPECS
+from revoco.core.errors import ReversalGateClosed, ValidationError
+from revoco.reversal import (
     InverseRegistry,
     InverseSpec,
     JournalState,
     ReversalEngine,
     Reversibility,
 )
-from praetor.reversal.model import InverseStep, ReversalGate
+from revoco.reversal.model import InverseStep, ReversalGate
 
 # ---------------------------------------------------------------------------
 # Semantic assertions about the specs themselves

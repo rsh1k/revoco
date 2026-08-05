@@ -1,10 +1,15 @@
-# Praetor
+# Revoco
+
+[![ci](https://github.com/rsh1k/revoco/actions/workflows/ci.yml/badge.svg)](https://github.com/rsh1k/revoco/actions/workflows/ci.yml)
+[![PyPI](https://img.shields.io/pypi/v/revoco.svg)](https://pypi.org/project/revoco/)
+[![Python](https://img.shields.io/pypi/pyversions/revoco.svg)](https://pypi.org/project/revoco/)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
 **An action control plane for AI agents.** Delegated authority, per-action policy enforcement, **reversible execution**, and evidence a regulator can verify.
 
-A Roman *praetor* held delegated *imperium*, issued *edicta*, and could stop an act in progress by *interdictum*. That is the shape of this package: authority that attenuates as it is delegated, policy as reviewable data, and interception at the moment an action becomes real.
+*Revoco* is Latin for **"I call it back."** That is the whole thesis: agent governance is crowded with tools that answer *was this allowed* and *was this logged*, and almost none that answer *can we take it back*. The third question is the one that decides whether an incident costs an afternoon or a quarter.
 
-Praetor merges three earlier tools and adds the layer none of them had:
+Revoco merges three earlier tools and adds the layer none of them had:
 
 | Merged from | Contributes |
 |---|---|
@@ -21,7 +26,7 @@ Agent governance tooling is overwhelmingly about detection: was this call allowe
 
 When an agent has already repointed a supplier's bank account and paid an invoice into it, knowing exactly what happened is necessary and not sufficient. Somebody still has to put it back — by hand, under time pressure, while the auditors watch. Reversibility is not a recovery procedure you write afterwards. By then the prior state is gone.
 
-So Praetor treats reversibility as **a property of the action, declared and planned before the action runs**, and as a **first-class authorization input**:
+So Revoco treats reversibility as **a property of the action, declared and planned before the action runs**, and as a **first-class authorization input**:
 
 ```yaml
 - id: no-undo-needs-a-human
@@ -36,16 +41,20 @@ Enforcement stops being only *"may this agent do it?"* and becomes also *"and ca
 
 ## Quick start
 
-Not on PyPI yet — install from source:
+```bash
+pip install revoco
+```
+
+Or from source:
 
 ```bash
-git clone https://github.com/rsh1k/praetor.git
-cd praetor && uv venv && uv pip install -e ".[dev]"
+git clone https://github.com/rsh1k/revoco.git
+cd revoco && uv venv && uv pip install -e ".[dev]"
 ```
 
 ```python
-from praetor import ControlPlane, Scope, crypto
-from praetor.reversal import ap_starter_registry, Reversibility
+from revoco import ControlPlane, Scope, crypto
+from revoco.reversal import ap_starter_registry, Reversibility
 
 cp = ControlPlane(inverse_registry=ap_starter_registry(), state_reader=my_erp.read_state)
 
@@ -83,7 +92,7 @@ cp.contain(grant.id, my_erp.execute)   # revoke grant + subtree, then roll back 
 See the whole thing work on a vendor-payment-fraud scenario:
 
 ```bash
-praetor demo
+revoco demo
 ```
 
 ---
@@ -116,14 +125,14 @@ Three capabilities exist only because authority, enforcement, and reversal are i
 
 ## System-of-record adapters
 
-`praetor.adapters` ships **specification-grade** inverse registries for 91 operations across eight surfaces. Full semantics, citations, and a validation checklist are in [docs/ADAPTERS.md](docs/ADAPTERS.md).
+`revoco.adapters` ships **specification-grade** inverse registries for 91 operations across eight surfaces. Full semantics, citations, and a validation checklist are in [docs/ADAPTERS.md](docs/ADAPTERS.md).
 
 ```bash
-praetor surfaces --gates    # what's covered, and every gate you must implement
+revoco surfaces --gates    # what's covered, and every gate you must implement
 ```
 
 ```python
-from praetor.adapters import registry_for
+from revoco.adapters import registry_for
 registry = registry_for("cloud", "devops", "workstation")   # load only what you govern
 ```
 
@@ -168,7 +177,7 @@ Findings worth pulling out:
 Workday's `Correct` is deliberately modeled as `COMPENSABLE`, never `REVERSIBLE`, even though it restores the value exactly — a correction rewrites the record rather than reversing it, so the effective-dated history reads as though the corrected value was always intended. The number comes back; the record of what happened does not, and for an evidence system that is the part that counts. Compare `stripe.subscription.update` (schedule cancellation — reversible) with `stripe.subscription.cancel` (immediate — irreversible): nearly identical in a tool list, opposite in recoverability.
 
 ```bash
-praetor inverses-check examples/inverses_sap.json
+revoco inverses-check examples/inverses_sap.json
 ```
 
 lists the sequenced undos, the one-shot specs, and every gate your `GateEvaluator` must answer. It exits non-zero if a spec reads `snapshot.X` without declaring `X` in `snapshot_fields` — the easiest way to author a phantom rollback.
@@ -195,7 +204,7 @@ Every place needing production hardening is marked `# HARDENING:` in the source.
 
 ## Standards alignment
 
-`praetor controls` prints the full mapping. Summary:
+`revoco controls` prints the full mapping. Summary:
 
 | Framework | Covered |
 |---|---|
@@ -205,7 +214,7 @@ Every place needing production hardening is marked `# HARDENING:` in the source.
 | **SR 11-7 / OCC** | III.B process verification · V governance & controls |
 | **SOX / ICFR** | Change authorization over financial records · reversal of unauthorized entries |
 
-On **Article 19** specifically: providers must keep logs "to the extent such logs are under their control." Praetor's ledger is held by the deployer and independently verifiable from its head hash and Merkle root. Evidence that lives only in a vendor's cloud is evidence whose control is, at minimum, arguable.
+On **Article 19** specifically: providers must keep logs "to the extent such logs are under their control." Revoco's ledger is held by the deployer and independently verifiable from its head hash and Merkle root. Evidence that lives only in a vendor's cloud is evidence whose control is, at minimum, arguable.
 
 ASI04 (supply chain) and ASI05 (unexpected code execution) are deliberately left to complementary controls — manifest signing and execution sandboxing — because they belong at a different layer.
 
@@ -214,11 +223,11 @@ ASI04 (supply chain) and ASI05 (unexpected code execution) are deliberately left
 ## CLI
 
 ```bash
-praetor policy-check   policy.yaml               # validate a policy, warn on risky defaults
-praetor inverses-check inverses.yaml             # validate an inverse registry
-praetor coverage       inverses.yaml --tools a,b # rollback readiness for a tool surface
-praetor controls                                 # print the control mapping
-praetor demo                                     # end-to-end AP fraud scenario
+revoco policy-check   policy.yaml               # validate a policy, warn on risky defaults
+revoco inverses-check inverses.yaml             # validate an inverse registry
+revoco coverage       inverses.yaml --tools a,b # rollback readiness for a tool surface
+revoco controls                                 # print the control mapping
+revoco demo                                     # end-to-end AP fraud scenario
 ```
 
 `coverage` exits non-zero when tools have no declared inverse, so it works as a CI gate: adding a write operation without classifying its undo path fails the build.
@@ -228,7 +237,7 @@ praetor demo                                     # end-to-end AP fraud scenario
 ## Layout
 
 ```
-src/praetor/
+src/revoco/
   core/            crypto (Ed25519, SHA-256, RFC-8785 canonical JSON), ids, errors
   authority/       principals · scope · delegation · revocation · chain reconstruction
   gate/            policy · conditions · threat scanner · session budgets · PDP

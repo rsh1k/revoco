@@ -1,7 +1,7 @@
 # A reversibility-first policy for an accounts-payable agent surface.
 #
 # Rules are evaluated top to bottom; the first match wins, like a firewall.
-# Validate before shipping:   praetor policy-check examples/policy.yaml
+# Validate before shipping:   revoco policy-check examples/policy.yaml
 
 name: ap-reversibility-first
 version: "1"

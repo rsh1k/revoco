@@ -18,7 +18,7 @@
     {
       "arg_map": {
         "Business_Process_Reference": "result.Business_Process_Reference",
-        "Comment": "const:rescinded by praetor control plane"
+        "Comment": "const:rescinded by revoco control plane"
       },
       "degraded_kind": "irreversible",
       "gates": [
@@ -66,7 +66,7 @@
     {
       "arg_map": {
         "Business_Process_Reference": "result.Business_Process_Reference",
-        "Comment": "const:rescinded by praetor control plane"
+        "Comment": "const:rescinded by revoco control plane"
       },
       "degraded_kind": "irreversible",
       "gates": [
@@ -108,7 +108,7 @@
     {
       "arg_map": {
         "Business_Process_Reference": "result.Business_Process_Reference",
-        "Comment": "const:rescinded by praetor control plane"
+        "Comment": "const:rescinded by revoco control plane"
       },
       "degraded_kind": "irreversible",
       "gates": [
@@ -151,7 +151,7 @@
     {
       "arg_map": {
         "Business_Process_Reference": "result.Business_Process_Reference",
-        "Comment": "const:rescinded by praetor control plane"
+        "Comment": "const:rescinded by revoco control plane"
       },
       "degraded_kind": "irreversible",
       "gates": [
@@ -193,7 +193,7 @@
     },
     {
       "arg_map": {
-        "Comment": "const:corrected back by praetor control plane",
+        "Comment": "const:corrected back by revoco control plane",
         "Currency": "snapshot.Currency",
         "Frequency": "snapshot.Frequency",
         "Total_Base_Pay": "snapshot.Total_Base_Pay",

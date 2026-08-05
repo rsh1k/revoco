@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from praetor.core.errors import TamperDetected
-from praetor.ledger import GENESIS_PREV_HASH, Ledger, LedgerEntry
+from revoco.core.errors import TamperDetected
+from revoco.ledger import GENESIS_PREV_HASH, Ledger, LedgerEntry
 
 
 def _fill(n: int = 5) -> Ledger:

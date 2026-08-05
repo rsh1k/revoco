@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import pytest
 
-from praetor.authority.principals import Principal, PrincipalKind
-from praetor.core import crypto
-from praetor.core.errors import PolicyError
-from praetor.gate import (
+from revoco.authority.principals import Principal, PrincipalKind
+from revoco.core import crypto
+from revoco.core.errors import PolicyError
+from revoco.gate import (
     Effect,
     InMemorySessionStore,
     PolicyEngine,
@@ -16,7 +16,7 @@ from praetor.gate import (
     redact_arguments,
     starter_policy,
 )
-from praetor.reversal.model import Reversibility
+from revoco.reversal.model import Reversibility
 
 
 def _principal(pid: str = "prn_bot", roles: set[str] | None = None) -> Principal:
