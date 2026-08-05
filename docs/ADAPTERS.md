@@ -1,6 +1,14 @@
 # System-of-record adapters
 
-**Status: specification, not a validated integration.**
+**Status: one surface validated, seven specified.**
+
+`workstation` (14 specs) is **validated against a real filesystem and a real git repo** — 11 of 11 drillable inverses restore state, and 10 prose claims were probed empirically. Run it yourself:
+
+```bash
+python scripts/validate_workstation.py
+```
+
+The other seven surfaces are **specification, not validated integration.**
 
 Everything else in Revoco is transferable across customers. This is not. Knowing that an SAP payment reversal is a three-step ordered sequence, that a Workday rescind dies the moment payroll runs, or that an S3 delete is recoverable only if someone enabled versioning first, is per-system knowledge that has to be built once and maintained forever. It is also the moat — capital cannot shortcut it, and a horizontal identity vendor will not do it.
 
@@ -23,7 +31,7 @@ revoco surfaces --gates     # what is covered, and every gate you must implement
 | `devops` | 12 | GitHub refs and protection, Kubernetes, feature flags |
 | `database` | 8 | Row writes, arbitrary SQL, schema migrations |
 | `saas` | 12 | Salesforce records, Slack messages, Stripe payments |
-| `workstation` | 14 | Filesystem, git, shell — what coding agents actually touch |
+| `workstation` | 14 | Filesystem, git, shell — what coding agents actually touch — **validated** |
 
 Two numbers from `revoco surfaces` are worth reporting upward:
 
@@ -301,3 +309,30 @@ Load only the surfaces you actually govern — a registry claiming to classify S
 Return `True` to open a gate, `False` to close it, or a **string** to close it with an explanation that reaches the incident responder. Raising is treated as closed.
 
 A spec that declares gates and runs without an evaluator refuses to execute, and an authorize-phase gate with no evaluator degrades the classification to irreversible. Both are deliberate: an unverifiable precondition is not a precondition, and at authorize time "assume the worst" is what makes the escalation trustworthy.
+
+---
+
+## What validating one surface actually taught us
+
+`scripts/validate_workstation.py` drills all 11 drillable inverses against a real filesystem and a real `git init` repo, then probes the prose claims the classifications rest on. It found five things, and every one of them is a pattern that will recur on the surfaces still unvalidated.
+
+**1. A snapshot field that looks right can produce an undo that succeeds and leaves you somewhere else.** `git.checkout`'s inverse restores `snapshot.head_ref`. The first integration captured that as `git symbolic-ref HEAD` — `refs/heads/main` — and feeding a full ref path to `git checkout` **detaches HEAD** instead of switching to the branch. The inverse returned success. State was materially different. Nothing but a state comparison catches that, which is the entire argument for drills over health checks.
+
+**2. Drills contaminate each other unless canaries are independent.** The first version shared one repo across all drills. Earlier drills left the tree clean, so `git.switch_with_stash` stashed nothing and its inverse died with *"No stash entries found"*. One drill's residue had become the next one's precondition. Each drill now gets its own sandbox. **If you point a drill suite at production, canaries must be independent or you are measuring the order you happened to run them in.**
+
+**3. A plausible mechanism can be the wrong reason for a correct classification.** `fs.delete_file` is `COMPENSABLE`, and the original residue explained why: the recreated file gets a new inode. The probe found the inode **immediately reused** when nothing else referenced it. The classification was right; the stated reason was not. The residue now cites the broken hard link, which held on every run. A residue nobody has tested is a plausible story, and plausible stories are what this package exists to replace.
+
+**4. Captured-and-never-restored fields need saying out loud.** `fs.delete_file` snapshots `mtime` and `owner`, and its inverse — a write — cannot restore either. That is not dead code: they let an evidence pack state precisely what was lost. But the original residue implied restoring them was an option the spec declined to take, which reads as a choice rather than a limit.
+
+**5. A drill runner with no gate evaluator cannot drill anything gated.** Three specs failed with *"no inverse operation exists"* until an evaluator was supplied, because an unverifiable authorize-phase gate degrades the classification to irreversible. The machinery refusing to guess is correct. The trap is that a harness without one appears to validate the whole surface while silently covering only the ungated part of it.
+
+### What this means for the other seven surfaces
+
+The failure modes above are not filesystem-specific. Expect the same shapes in SAP and Workday:
+
+- an argument captured in the upstream API's vocabulary that means something subtly different when fed back (finding 1 — the highest-risk class, because it looks like success)
+- canaries that interfere, especially on surfaces with shared state like an accounting period or a payroll run (finding 2)
+- residue prose written from documentation rather than observation (finding 3)
+- gates that no evaluator answers, silently shrinking what a drill actually covers (finding 5)
+
+Which is the argument for validating the cheap surface first: none of these five needed an ERP sandbox to find, and all five would have cost far more to discover there.

@@ -58,6 +58,13 @@ jobs:
         # starts losing something new does.
         run: uv run revoco bench
 
+      - name: Validate the workstation adapter against a real filesystem and git
+        # The only adapter that can be validated without a vendor sandbox. It drills
+        # every inverse against real files and a real `git init` repo, and probes the
+        # prose claims the classifications rest on. Keeping it in CI is what stops the
+        # 14 specs sliding back to "unvalidated" the next time someone edits them.
+        run: uv run python scripts/validate_workstation.py
+
       - name: End-to-end demo
         run: uv run python -m revoco.demo
 

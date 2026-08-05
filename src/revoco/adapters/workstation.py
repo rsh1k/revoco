@@ -132,14 +132,23 @@ WORKSTATION_SPECS: list[InverseSpec] = [
         gates=(GATE_CONTENT_CAPTURABLE,),
         degraded_kind=Reversibility.IRREVERSIBLE,
         residue=(
-            "The content comes back but the file does not: it has a new inode, so any "
-            "hard links to the original are now separate files, and mtime, ctime, and "
-            "ownership are reset unless explicitly restored. Anything watching the path "
-            "saw a delete event."
+            "The content comes back; the file does not. Any hard links to the original "
+            "now point at a separate file, and mtime and ctime are reset — this inverse "
+            "writes content and mode, and cannot restore timestamps or ownership at all. "
+            "Anything watching the path saw a delete event."
         ),
         notes=(
-            "Compensable rather than reversible for the inode reason. It matters more "
-            "than it sounds on systems where hard links carry meaning."
+            "Compensable rather than reversible because the identity of the file is not "
+            "restored, only its bytes. `scripts/validate_workstation.py` measures this "
+            "against a real filesystem, and corrected the original wording: that version "
+            "claimed the recreated file gets a new inode, and the probe found the inode "
+            "immediately REUSED when nothing else referenced it. The observable "
+            "consequence — a broken hard link — held every time, so the residue now cites "
+            "that rather than an inode number that is filesystem- and timing-dependent.\n\n"
+            "`mtime` and `owner` are captured but deliberately not read by the inverse: "
+            "there is no way to restore them through a write. They are here so an "
+            "evidence pack can state precisely what was lost, which is worth more than "
+            "pretending it was not."
         ),
     ),
     InverseSpec(
