@@ -175,13 +175,17 @@ class Harness:
             # A step whose tool is outside the sub-grant runs under the root grant;
             # this is how scenarios exercise sub-delegated blast radius without
             # having to name principals explicitly.
-            use_sub = sub is not None and step.tool in (scenario.grant.sub_tools or frozenset())
+            under_sub = (
+                sub if (sub is not None and step.tool in (scenario.grant.sub_tools or frozenset()))
+                else None
+            )
+            use_sub = under_sub is not None
             step_result = self._run_step(
                 cp,
                 step,
                 actor_id=worker.id if use_sub else agent.id,
                 actor_key=w_priv if use_sub else o_priv,
-                delegation_id=sub.id if use_sub else root.id,
+                delegation_id=under_sub.id if under_sub is not None else root.id,
                 session=session,
                 world=world,
             )
