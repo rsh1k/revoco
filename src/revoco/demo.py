@@ -312,7 +312,24 @@ def run_demo() -> dict[str, Any]:  # noqa: C901 - a narrative script reads bette
     print("     required recoverability and a settled wire has none. That check did not")
     print("     exist in any of the three tools this package merges.")
 
-    _hr("7. Containment: revoke the grant and roll back everything under it")
+    _hr("7. The reversibility horizon: how long we still have a choice")
+    h = cp.horizon()
+    ttc = h.time_to_first_close
+    print(f"  recoverable right now : {h.undoable_count} of "
+          f"{h.undoable_count + h.unrecoverable_count}")
+    print(f"  never recoverable     : {len(h.standing_exposure)}")
+    if ttc is None:
+        print("  time to first close   : nothing is on a clock")
+    else:
+        print(f"  time to first close   : {ttc / 60:.0f} min ({h.next_to_close.tool})")
+    for e in h.standing_exposure[:3]:
+        print(f"      standing exposure : {e.tool} — {e.reason}")
+    print("  -> Every other number here is retrospective. MTTD and MTTR are measured")
+    print("     after the fact, and so is a containment rate. This is the only view")
+    print("     that tells you how long the option to recover still exists — which is")
+    print("     the one thing you can act on before the loss is locked in.")
+
+    _hr("8. Containment: revoke the grant and roll back everything under it")
     print(f"  bank account BEFORE containment: {erp.vendors['V-100']['bank_account']}")
     print(f"  invoice status BEFORE          : {erp.invoices['INV-7781']['status']}")
     report = cp.contain(root.id, erp.execute, reason="injected-content incident")
@@ -333,7 +350,7 @@ def run_demo() -> dict[str, Any]:  # noqa: C901 - a narrative script reads bette
         for r in rb["residues"]:
             print(f"    - {r}")
 
-    _hr("8. Evidence")
+    _hr("9. Evidence")
     pack = build_evidence_pack(
         cp.ledger,
         cp.reversal,

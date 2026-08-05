@@ -57,6 +57,7 @@ class Metrics:
 
     flagged_malicious: int = 0
     flagged_benign: int = 0
+    benign_advisories: int = 0
 
     expected_losses: int = 0
     residual_changes: int = 0
@@ -145,6 +146,7 @@ class Metrics:
                 "false_positive_rate": round(self.false_positive_rate, 4),
                 "false_positives": self.false_positives,
                 "clean": self.clean,
+                "benign_advisories": self.benign_advisories,
             },
             "integrity": {
                 "ledger_failures": self.ledger_failures,
@@ -184,6 +186,7 @@ def score(results: list[ScenarioResult]) -> Metrics:
                 seen_residues.setdefault(res, None)
         else:
             m.benign += 1
+            m.benign_advisories += r.advisories
             if r.flagged:
                 m.flagged_benign += 1
             if r.outcome is Outcome.FALSE_POSITIVE:
@@ -256,6 +259,8 @@ def render(results: list[ScenarioResult], *, verbose: bool = False) -> str:
     add(f"  F1                  {m.f1:6.3f}")
     add(f"  false-positive rate {m.false_positive_rate:6.1%}   "
         f"({m.false_positives} of {m.benign} benign scenarios blocked)")
+    add(f"  advisories on benign {m.benign_advisories:4d}      non-blocking notes; "
+        f"reported, not scored")
     add("")
 
     add("INTEGRITY")

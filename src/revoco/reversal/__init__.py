@@ -16,6 +16,7 @@ from .engine import (
     EVT_PLAN,
     ReversalEngine,
 )
+from .horizon import Horizon, HorizonEntry
 from .model import (
     CascadeReport,
     GateEvaluator,
@@ -36,6 +37,8 @@ from .registry import AP_STARTER_SPECS, InverseRegistry, ap_starter_registry
 
 __all__ = [
     "Reversibility",
+    "Horizon",
+    "HorizonEntry",
     "InverseSpec",
     "InverseStep",
     "ReversalGate",

@@ -105,3 +105,46 @@ on:
 ```
 
 and cut releases with `git tag v0.2.0 && git push --tags`. Everything else in the workflow works unchanged.
+
+---
+
+## Scheduling recovery drills
+
+Releases keep the code fresh; drills keep the *rollback claims* fresh. A spec that was correct when written silently becomes a confident wrong rollback after an ERP upgrade, and nothing but a drill detects that.
+
+Drills touch real systems of record, so this cannot be a repo workflow — it needs your credentials and your canary resources. Run it wherever you run scheduled jobs against those systems:
+
+```python
+from revoco.adapters import registry_for
+from revoco.drills import Canary, DrillRunner, RecoverabilityRegister, render_report
+
+register = RecoverabilityRegister(stale_after=24 * 3600)   # load from your own store
+runner = DrillRunner(
+    registry_for("sap", "cloud"),
+    executor=my_client.execute,          # the same executor production undos use
+    state_reader=my_client.read_state,
+    gate_evaluator=my_gate_evaluator,
+)
+
+canaries = [
+    Canary(
+        tool="sap.supplier.bank.update",
+        args={"BusinessPartner": "V-CANARY", "BankIdentification": "0001",
+              "BankAccount": "GB00-DRILL-0000-0000"},
+        verify=lambda: my_client.read_supplier_bank("V-CANARY"),
+        compare_fields=("BankAccount", "IBAN"),
+    ),
+]
+
+results = runner.drill_due(register, canaries, max_batch=10)
+print(render_report(register))
+```
+
+Then persist `register` and alert on `register.report()["alarming"]`.
+
+**The canary is the safety boundary and it is yours to get right.** Point one at production data and the drill becomes the incident. Use a dedicated supplier record, a dedicated bucket key, a scratch namespace.
+
+Two settings worth thinking about rather than accepting:
+
+- `stale_after` — how long a proof stays good. Tighten it for surfaces that change often; an ERP on a quarterly upgrade cycle and a Kubernetes cluster deploying hourly do not deserve the same window.
+- `max_batch` — drills perform real writes and real undos. Ninety tools at once is ninety of each. The throttle matters more than completeness, and `due()` orders the work so the throttle drops the least urgent.

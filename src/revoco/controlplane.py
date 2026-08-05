@@ -631,6 +631,15 @@ class ControlPlane:
         rec = self.authority.get_action(action_id)
         return rec.session_id if rec else ""
 
+    def horizon(self, **kw: Any) -> Any:
+        """Remaining recovery options, soonest deadline first.
+
+        Worth putting on a dashboard next to the retrospective numbers: an undo
+        window that closes quietly is a capability the organization believes it has
+        right up to the moment it reaches for one.
+        """
+        return self.reversal.horizon(**kw)
+
     # ---- undo -------------------------------------------------------------
     def undo(
         self, action_id: str, executor: InverseExecutor, *, now: float | None = None

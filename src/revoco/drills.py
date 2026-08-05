@@ -269,6 +269,38 @@ class DrillRunner:
     ) -> list[DrillResult]:
         return [self.drill(c, now=now) for c in canaries]
 
+    def drill_due(
+        self,
+        register: RecoverabilityRegister,
+        canaries: Iterable[Canary],
+        *,
+        now: float | None = None,
+        refresh_at: float = 0.8,
+        max_batch: int | None = None,
+    ) -> list[DrillResult]:
+        """Drill only what needs it, record the results, return them.
+
+        The scheduler entry point: point a cron at this with a canary per tool and
+        proof stays fresh without anyone remembering to check. Results are recorded
+        into the register as they run, so a batch that is cut short by ``max_batch``
+        still improves the picture rather than being wasted.
+        """
+        by_tool: dict[str, Canary] = {}
+        for c in canaries:
+            by_tool.setdefault(c.tool, c)
+        due = register.due(
+            by_tool.keys(), now=now, refresh_at=refresh_at, max_batch=max_batch
+        )
+        results: list[DrillResult] = []
+        for item in due:
+            canary = by_tool.get(item.tool)
+            if canary is None:
+                continue
+            result = self.drill(canary, now=now)
+            register.record(result)
+            results.append(result)
+        return results
+
 
 @dataclass
 class ProvenRecoverability:
@@ -379,6 +411,74 @@ class RecoverabilityRegister:
         # Evidence exists and it is bad or stale. Trusting the declaration over the
         # evidence is how a phantom rollback stays believed.
         return Reversibility.IRREVERSIBLE
+
+    # ---- scheduling -------------------------------------------------------
+    def due(
+        self,
+        tools: Iterable[str],
+        *,
+        now: float | None = None,
+        refresh_at: float = 0.8,
+        max_batch: int | None = None,
+    ) -> list[DrillDue]:
+        """Which tools need drilling now, most urgent first.
+
+        ``refresh_at`` re-drills before the proof actually lapses — at 0.8, a tool
+        whose freshness window is a day gets re-drilled after about 19 hours. Waiting
+        for expiry would mean every tool spends part of its life classified
+        irreversible by the proof gate purely because the scheduler had not got to it
+        yet, which would make the gate feel like a bug rather than a control. Renew
+        before expiry, like a certificate.
+
+        ``max_batch`` bounds the run. Drilling ninety tools at once means ninety real
+        writes and ninety real undos against production systems of record, so the
+        scheduler needs a throttle more than it needs completeness — and the ordering
+        guarantees the throttle drops the least urgent work.
+        """
+        when = now if now is not None else time.time()
+        out: list[DrillDue] = []
+
+        for tool in tools:
+            entry = self._by_tool.get(tool)
+            if entry is None:
+                out.append(DrillDue(
+                    tool=tool, urgency="never_drilled", priority=_URGENCY["never_drilled"],
+                    age_seconds=None,
+                    reason="no drill has ever run; the undo path is an untested hypothesis",
+                ))
+                continue
+            if entry.last is not None and entry.last.outcome is DrillOutcome.NOT_DRILLABLE:
+                continue   # irreversible by design: nothing to prove, ever
+            if entry.last is not None and entry.last.outcome.is_alarm:
+                out.append(DrillDue(
+                    tool=tool, urgency="failing", priority=_URGENCY["failing"],
+                    age_seconds=entry.age(now=when),
+                    reason=f"last drill {entry.last.outcome.value}: {entry.last.summary[:80]}",
+                ))
+                continue
+
+            age = entry.age(now=when)
+            if age is None:
+                out.append(DrillDue(
+                    tool=tool, urgency="never_drilled", priority=_URGENCY["never_drilled"],
+                    age_seconds=None, reason="has drill history but no passing drill",
+                ))
+            elif age > entry.stale_after:
+                out.append(DrillDue(
+                    tool=tool, urgency="stale", priority=_URGENCY["stale"], age_seconds=age,
+                    reason=(
+                        f"proof expired {(age - entry.stale_after) / 3600:.1f}h ago; the "
+                        "proof gate is already treating this as irreversible"
+                    ),
+                ))
+            elif age >= entry.stale_after * refresh_at:
+                out.append(DrillDue(
+                    tool=tool, urgency="ageing", priority=_URGENCY["ageing"], age_seconds=age,
+                    reason=f"proof is {age / 3600:.1f}h old; refresh before it lapses",
+                ))
+
+        out.sort(key=lambda d: (d.priority, -(d.age_seconds or 0.0)))
+        return out[:max_batch] if max_batch else out
 
     # ---- reporting --------------------------------------------------------
     def report(self, *, now: float | None = None) -> dict[str, Any]:
@@ -546,6 +646,38 @@ def attest(
     return dataclasses.replace(att, signature=sig)
 
 
+
+# ---------------------------------------------------------------------------
+# Scheduling
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class DrillDue:
+    """One tool that needs drilling, and why."""
+
+    tool: str
+    urgency: str          # never_drilled | failing | stale | ageing
+    priority: int         # lower runs sooner
+    age_seconds: float | None
+    reason: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "tool": self.tool,
+            "urgency": self.urgency,
+            "priority": self.priority,
+            "age_seconds": round(self.age_seconds, 2) if self.age_seconds is not None else None,
+            "reason": self.reason,
+        }
+
+
+# Lower sorts first. `failing` outranks `never_drilled` because a tool that was
+# proven and then broke is a live regression against something the organization is
+# actively relying on, whereas an undrilled tool is a known unknown.
+_URGENCY = {"failing": 0, "never_drilled": 1, "stale": 2, "ageing": 3}
+
+
 def render_report(register: RecoverabilityRegister, *, now: float | None = None) -> str:
     """Human-readable drill status."""
     rep = register.report(now=now)
@@ -574,6 +706,7 @@ def render_report(register: RecoverabilityRegister, *, now: float | None = None)
 
 __all__ = [
     "Canary",
+    "DrillDue",
     "DrillOutcome",
     "DrillResult",
     "DrillRunner",

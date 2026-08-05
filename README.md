@@ -123,6 +123,85 @@ Three capabilities exist only because authority, enforcement, and reversal are i
 
 ---
 
+## Reversibility as a perishable asset
+
+Everything above treats recoverability as a fact asserted at design time: a spec says `REVERSIBLE` and that claim is believed forever. Three additions treat it as what it actually is — an asset that decays, has to be capped, and has to be re-proven.
+
+### Recovery drills — `revoco.drills`
+
+Backup teams settled this decades ago: *a backup that has never been restored is a hypothesis; a restore drill is the experiment.* Agent rollback has the same silent failure mode and none of the discipline. (The existing agent-rollback-drill writing is about redeploying agent *versions* — a different thing entirely from proving `sap.supplier.bank.update`'s inverse still works after last week's ERP upgrade.)
+
+A drill runs the real forward action against a disposable canary, runs the real inverse, then **compares state**. An inverse that returns 200 and restores nothing passes every check except this one.
+
+```python
+runner.drill_due(register, canaries, max_batch=10)   # point a cron at this
+```
+
+`register.due(tools)` orders work by urgency — a *failing* drill outranks a never-drilled tool, because a proven capability that broke is a live regression against something in use — and refreshes proof at 80% of its freshness window rather than after expiry, like renewing a certificate.
+
+**Proof-gated classification** is the inversion worth having: a spec claiming `REVERSIBLE` whose drill is failing or stale **stops being treated as reversible**. The hook can only ever downgrade — guarded, not trusted, because manufacturing recoverability is the one direction this system must never move in.
+
+Plus signed **proof-of-recoverability attestations**. Every comparable system signs *what happened*; this signs *that it could be undone, and when the inverse was last proven working*. That's the artifact an SR 11-7 or AI-Act auditor asks for and cannot get elsewhere.
+
+### Irreversibility budget — `IrreversibilityBudget`
+
+A ceiling on unrecoverable exposure per grant. The benchmark measured why detection isn't enough: `PRA01` is a threshold detector, so **four one-way wires had already left** before the pattern was visible. Detection needs evidence, and the evidence is the damage.
+
+| Control | Wires that landed (same scenario, same rubber-stamping human) |
+|---|---|
+| Detection only | 4 of 6 |
+| Budget ceiling 1.5 | 2 of 6 |
+| Budget ceiling 0.8 | 1 of 6 |
+
+The concept is published ([arXiv 2603.03515](https://arxiv.org/pdf/2603.03515), military AI governance). This differs in one way that matters: **that framework scores per tool; this scores per resolved action.** `aws.s3.delete_object` has no single irreversibility score — recoverable against a versioned bucket, final against an unversioned one. A tool-keyed budget would either bankrupt safe cleanup or hand out free credit for permanent deletion.
+
+Reversible work is free, so it is not a rate limiter. Cost scales with risk. Named residue carries a surcharge, so "compensable" isn't a loophole. A successful undo refunds headroom. Replenishment is manual, because forcing a human back into the loop is the entire point.
+
+### Reversibility horizon — `cp.horizon()`
+
+Every other number here is retrospective. MTTD and MTTR are industry standards and both are measured after the fact; so is a containment rate. Nothing measures **how long you still can recover** — and undo windows expire quietly.
+
+```
+time to first close   4.0 min  (b.window)
+recoverable now       3 of 5  (60%)
+  standing exposure      1   never undoable
+  broken                 1   claims an undo it cannot run
+```
+
+`time_to_first_close` is the headline: how long until the soonest undo option disappears. **MTTR asks how fast you recover; this asks how long you still have the choice.**
+
+It keeps five states apart, and the distinctions carry the value: a window that *closed* is a different problem from one that *never existed* (`standing_exposure`), and both differ from a plan that claims an undo it cannot run (`broken`) — which reads as recoverable in every report except this one.
+
+---
+
+## The containment benchmark
+
+```bash
+revoco bench
+```
+
+The closest public comparison is Uber's [ADR-Bench](https://github.com/uber/ADR), which scores **detection**: 302 tasks (42 malicious, 260 benign) across 133 MCP servers, reporting 67% detection at zero false positives ([arXiv 2605.17380](https://arxiv.org/abs/2605.17380)). That's the right question for a detection-and-response system, and their prevention layer isn't open-sourced.
+
+It's the wrong ceiling for anything claiming actions can be undone. **A system that detects every attack and reverses nothing scores 100% and has prevented no loss.** So the headline here is containment:
+
+```
+containment = prevented + verifiably recovered
+```
+
+Current: **57 scenarios (18 malicious, 39 benign) across 17 techniques — 83.3% containment, 0% false positives, 100% precision.**
+
+The load-bearing design choice: `recovered` is established by **comparing world state against a pre-attack baseline, never by reading a reversal receipt.** A phantom rollback produces a receipt indistinguishable from a real one, so a receipt-based benchmark would certify the exact failure mode this package exists to prevent. There's a test that proves it — an inverse reporting success while changing nothing scores `UNCONTAINED`.
+
+Every malicious technique has a **benign twin on the same tools**, so a policy that blocks the tool outright scores badly. Several benign scenarios exist purely to probe detector false-positive risk: legitimate `../` paths, SQL in a config, high-entropy certificate fingerprints, localised non-ASCII strings, a 12-write reversible burst, and a legitimate action taken *after* the same agent was refused once.
+
+Because it runs a real `ControlPlane` against a simulated world, it doubles as a regression suite for the 91 adapter specs — and it earned that keep immediately, finding six real defects including an inverse that relied on implicit convention and a `Rule` that couldn't express "escalate irreversible work only when consequential".
+
+**Honest about the comparison:** ADR-Bench is ~5× larger, drawn from real enterprise telemetry, and far more imbalanced (6:1 benign vs 2.2:1 here). Detection coverage is their strength; verified recoverability is this one's. Complementary instruments, not competing ones.
+
+One gap is left visible rather than tuned away: `T09` irreversible fan-out. `PRA01` is a threshold detector, so four one-way wires land before the pattern is visible. The controlled pair `M10`/`M18` measures detection versus the budget on the identical attack, and both stay in the corpus so the difference is attributable.
+
+---
+
 ## System-of-record adapters
 
 `revoco.adapters` ships **specification-grade** inverse registries for 91 operations across eight surfaces. Full semantics, citations, and a validation checklist are in [docs/ADAPTERS.md](docs/ADAPTERS.md).

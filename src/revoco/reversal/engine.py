@@ -741,6 +741,28 @@ class ReversalEngine:
             if e.plan.is_complete and not e.is_expired()
         ]
 
+    def horizon(
+        self,
+        *,
+        now: float | None = None,
+        warn_within: float = 3600.0,
+        session_id: str | None = None,
+        delegation_id: str | None = None,
+    ) -> Any:
+        """Which undo options are still open, and when each one closes.
+
+        The only forward-looking view in this package — everything else describes
+        what already happened. See :mod:`revoco.reversal.horizon`.
+        """
+        from .horizon import build as _build
+
+        entries = list(self._journal.values())
+        if session_id is not None:
+            entries = [x for x in entries if x.session_id == session_id]
+        if delegation_id is not None:
+            entries = [x for x in entries if x.delegation_id == delegation_id]
+        return _build(entries, now=now, warn_within=warn_within)
+
     def stats(self) -> dict[str, Any]:
         counts: dict[str, int] = {s.value: 0 for s in JournalState}
         for e in self._journal.values():

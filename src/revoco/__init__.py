@@ -62,6 +62,7 @@ from .core.errors import RevocoError
 from .detect import DetectionEngine, Finding, Severity, journal_health
 from .drills import (
     Canary,
+    DrillDue,
     DrillOutcome,
     DrillResult,
     DrillRunner,
@@ -74,6 +75,7 @@ from .gate import Decision, Effect, Policy, PolicyEngine, load_policy, starter_p
 from .ledger import Ledger, LedgerEntry
 from .reversal import (
     CascadeReport,
+    Horizon,
     InverseRegistry,
     InverseSpec,
     InverseStep,
@@ -133,6 +135,7 @@ __all__ = [
     "Canary",
     "DrillOutcome",
     "DrillResult",
+    "DrillDue",
     "RecoverabilityRegister",
     "RecoverabilityAttestation",
     "attest",
@@ -165,6 +168,7 @@ __all__ = [
     "JournalEntry",
     "JournalState",
     "CascadeReport",
+    "Horizon",
     # detection
     "DetectionEngine",
     "Finding",
