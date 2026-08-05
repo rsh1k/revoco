@@ -36,8 +36,11 @@ Enforcement stops being only *"may this agent do it?"* and becomes also *"and ca
 
 ## Quick start
 
+Not on PyPI yet — install from source:
+
 ```bash
-pip install praetor-controlplane
+git clone https://github.com/rsh1k/praetor.git
+cd praetor && uv venv && uv pip install -e ".[dev]"
 ```
 
 ```python
