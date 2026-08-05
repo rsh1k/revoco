@@ -2,18 +2,22 @@ name: release
 
 # Push source to main and a new version lands on PyPI. Nothing else to remember.
 #
-# Guards, because "publish on every push" is a bad idea unguarded:
+# Guards, because "publish on every push" unguarded is a bad idea:
 #   * tests must pass first — the publish job needs the test job
-#   * docs-only changes do not cut a release (see paths below)
-#   * `[skip release]` anywhere in the commit message skips it
+#   * docs-only changes do not cut a release (see `paths` below)
+#   * a `[skip release]` marker in the commit SUBJECT skips it
 #   * a version already on PyPI is never republished (PyPI versions are immutable,
 #     so a re-run must be a no-op rather than a hard failure)
-#   * the bump commit pushed by this workflow uses GITHUB_TOKEN, and pushes made
-#     with GITHUB_TOKEN do not trigger workflows — that is what stops the loop.
-#     The `[skip release]` marker on that commit is a second belt.
+#   * the bump commit is pushed with GITHUB_TOKEN, and GITHUB_TOKEN pushes do not
+#     trigger workflows — that is what stops the loop
 #
-# Bump level: `[major]` or `[minor]` in the commit message, otherwise patch.
+# Bump level: `[major]` or `[minor]` in the commit subject, otherwise patch.
 # Or run it by hand from the Actions tab and pick the level.
+#
+# Markers are read from the commit SUBJECT LINE ONLY, never the whole message. The
+# first version of this workflow scanned the full body, so the very commit that
+# documented the `[skip release]` marker skipped its own release — a commit that
+# merely *mentions* a marker must not trigger it.
 
 on:
   push:
@@ -40,8 +44,54 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  gate:
+    runs-on: ubuntu-latest
+    outputs:
+      release: ${{ steps.decide.outputs.release }}
+      level: ${{ steps.decide.outputs.level }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Decide whether to release, and at what level
+        id: decide
+        env:
+          EVENT: ${{ github.event_name }}
+          INPUT_BUMP: ${{ inputs.bump }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT" = "workflow_dispatch" ]; then
+            echo "release=true"           >> "$GITHUB_OUTPUT"
+            echo "level=${INPUT_BUMP}"    >> "$GITHUB_OUTPUT"
+            echo "Manual run: ${INPUT_BUMP}"
+            exit 0
+          fi
+
+          # Subject line only. Read from git rather than interpolating the message
+          # into the script, which keeps arbitrary commit text out of the shell.
+          SUBJECT="$(git log -1 --format=%s)"
+          echo "Subject: $SUBJECT"
+
+          if printf '%s' "$SUBJECT" | grep -qiF '[skip release]'; then
+            echo "release=false" >> "$GITHUB_OUTPUT"
+            echo "level=patch"   >> "$GITHUB_OUTPUT"
+            echo "Subject carries [skip release]; not releasing."
+            exit 0
+          fi
+
+          if printf '%s' "$SUBJECT" | grep -qiF '[major]'; then
+            LEVEL=major
+          elif printf '%s' "$SUBJECT" | grep -qiF '[minor]'; then
+            LEVEL=minor
+          else
+            LEVEL=patch
+          fi
+          echo "release=true"   >> "$GITHUB_OUTPUT"
+          echo "level=$LEVEL"   >> "$GITHUB_OUTPUT"
+          echo "Releasing: $LEVEL"
+
   test:
-    if: "!contains(github.event.head_commit.message, '[skip release]')"
+    needs: gate
+    if: needs.gate.outputs.release == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -56,7 +106,7 @@ jobs:
       - run: uv run python -m revoco.demo
 
   release:
-    needs: test
+    needs: [gate, test]
     runs-on: ubuntu-latest
     environment: pypi
     permissions:
@@ -70,40 +120,27 @@ jobs:
 
       - uses: astral-sh/setup-uv@v5
 
-      - name: Decide bump level
-        id: level
-        env:
-          MSG: ${{ github.event.head_commit.message }}
-        run: |
-          if [ -n "${{ inputs.bump }}" ]; then
-            LEVEL="${{ inputs.bump }}"
-          elif printf '%s' "$MSG" | grep -qi '\[major\]'; then
-            LEVEL=major
-          elif printf '%s' "$MSG" | grep -qi '\[minor\]'; then
-            LEVEL=minor
-          else
-            LEVEL=patch
-          fi
-          echo "level=$LEVEL" >> "$GITHUB_OUTPUT"
-          echo "Bumping: $LEVEL"
-
       - name: Bump version
         id: bump
+        env:
+          LEVEL: ${{ needs.gate.outputs.level }}
         run: |
-          NEW=$(python3 scripts/bump_version.py "${{ steps.level.outputs.level }}")
+          set -euo pipefail
+          NEW=$(python3 scripts/bump_version.py "$LEVEL")
           echo "version=$NEW" >> "$GITHUB_OUTPUT"
           echo "New version: $NEW"
 
       - name: Check PyPI does not already have this version
         id: exists
+        env:
+          VERSION: ${{ steps.bump.outputs.version }}
         run: |
+          set -euo pipefail
           NAME=$(python3 -c "import tomllib,pathlib;print(tomllib.loads(pathlib.Path('pyproject.toml').read_text())['project']['name'])")
-          echo "name=$NAME" >> "$GITHUB_OUTPUT"
-          CODE=$(curl -s -o /dev/null -w '%{http_code}' \
-            "https://pypi.org/pypi/$NAME/${{ steps.bump.outputs.version }}/json")
+          CODE=$(curl -s -o /dev/null -w '%{http_code}' "https://pypi.org/pypi/$NAME/$VERSION/json")
           if [ "$CODE" = "200" ]; then
             echo "already=true" >> "$GITHUB_OUTPUT"
-            echo "::warning::$NAME ${{ steps.bump.outputs.version }} is already on PyPI; skipping publish"
+            echo "::warning::$NAME $VERSION is already on PyPI; skipping publish"
           else
             echo "already=false" >> "$GITHUB_OUTPUT"
           fi
@@ -118,15 +155,17 @@ jobs:
 
       - name: Commit and tag the bump
         if: steps.exists.outputs.already == 'false'
+        env:
+          VERSION: ${{ steps.bump.outputs.version }}
         run: |
+          set -euo pipefail
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add pyproject.toml
-          # [skip release] on this commit is belt-and-braces: GITHUB_TOKEN pushes do
-          # not trigger workflows, so the loop is already broken without it.
-          git commit -m "Release v${{ steps.bump.outputs.version }} [skip release]"
-          git tag -a "v${{ steps.bump.outputs.version }}" \
-            -m "v${{ steps.bump.outputs.version }}"
+          # The marker on this subject is belt-and-braces: GITHUB_TOKEN pushes do not
+          # trigger workflows, so the loop is already broken without it.
+          git commit -m "Release v$VERSION [skip release]"
+          git tag -a "v$VERSION" -m "v$VERSION"
           git push origin HEAD:main --follow-tags
 
       - name: Publish to PyPI
@@ -140,8 +179,9 @@ jobs:
         if: steps.exists.outputs.already == 'false'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.bump.outputs.version }}
         run: |
-          gh release create "v${{ steps.bump.outputs.version }}" \
-            --title "v${{ steps.bump.outputs.version }}" \
+          gh release create "v$VERSION" \
+            --title "v$VERSION" \
             --generate-notes \
             dist/*

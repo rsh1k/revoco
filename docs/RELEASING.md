@@ -64,6 +64,7 @@ git commit -m "Tidy up internal comments [skip release]"
 | Publish needs the test job to pass | Lint, mypy, the full suite, the containment benchmark and the demo all run first. A red build never publishes. |
 | `paths` filter | Only `src/`, `tests/`, `examples/` and `pyproject.toml` trigger a release. Fixing a typo in the README doesn't burn a version number. |
 | `[skip release]` | Escape hatch for source changes that shouldn't ship on their own. |
+| Markers read from the **subject line only** | The first version of this workflow scanned the whole commit message, so the very commit that documented `[skip release]` skipped its own release. A commit that merely *mentions* a marker must not trigger it. |
 | `concurrency: release` | Releases are serialized. Two concurrent runs would race on the version number and one would try to publish a version the other already took. |
 | Version-exists check | PyPI versions are immutable and cannot be reused. If the target version is already published the job warns and skips instead of failing, so a re-run is a no-op. |
 | `GITHUB_TOKEN` pushes don't trigger workflows | This is what stops the bump commit from triggering another release. The `[skip release]` marker on that commit is a second belt. |
