@@ -103,11 +103,16 @@ class ReversalEngine:
         *,
         state_reader: StateReader | None = None,
         gate_evaluator: GateEvaluator | None = None,
+        classify_hook: Callable[[str, Reversibility], Reversibility] | None = None,
         on_event: EventSink | None = None,
     ) -> None:
         self.registry = registry or InverseRegistry()
         self.state_reader = state_reader
         self.gate_evaluator = gate_evaluator
+        # Applied after gate resolution. Lets a recoverability register demote a
+        # declared posture that has no fresh drill evidence behind it — see
+        # praetor.drills. Only ever downgrades.
+        self.classify_hook = classify_hook
         self._emit = on_event or _noop_sink
         self._journal: dict[str, JournalEntry] = {}
         self._by_action: dict[str, str] = {}
@@ -131,7 +136,7 @@ class ReversalEngine:
         if spec is None:
             return Reversibility.UNKNOWN
         if args is None or not spec.authorize_gates:
-            return spec.kind
+            return self._apply_hook(tool, spec.kind)
         closed = self._closed_gates(
             spec.authorize_gates, tool=tool, args=args, entry=None, phase=PHASE_AUTHORIZE
         )
@@ -141,8 +146,32 @@ class ReversalEngine:
                 {"tool": tool, "declared_kind": spec.kind.value,
                  "effective_kind": spec.degraded_kind.value, "closed_gates": closed},
             )
-            return spec.degraded_kind
-        return spec.kind
+            return self._apply_hook(tool, spec.degraded_kind)
+        return self._apply_hook(tool, spec.kind)
+
+    def _apply_hook(self, tool: str, kind: Reversibility) -> Reversibility:
+        """Run the classify hook, refusing any result that would upgrade.
+
+        Guarded rather than trusted: a hook that could raise a posture would let a
+        buggy or hostile integration manufacture recoverability the specs never
+        claimed, which is the one direction this system must never move in.
+        """
+        if self.classify_hook is None:
+            return kind
+        try:
+            proposed = self.classify_hook(tool, kind)
+        except Exception:
+            return kind
+        if not isinstance(proposed, Reversibility) or proposed.rank > kind.rank:
+            return kind
+        if proposed is not kind:
+            self._emit(
+                EVT_DEGRADED,
+                {"tool": tool, "declared_kind": kind.value,
+                 "effective_kind": proposed.value,
+                 "closed_gates": ["classify_hook: no fresh proof of recoverability"]},
+            )
+        return proposed
 
     def _closed_gates(
         self,

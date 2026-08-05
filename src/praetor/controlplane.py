@@ -60,6 +60,7 @@ from .gate.policy import Policy, starter_policy
 from .gate.session import InMemorySessionStore, SessionStore
 from .gate.threats import ThreatScanner
 from .ledger import Ledger
+from .reversal.budget import Charge, IrreversibilityBudget
 from .reversal.engine import ReversalEngine
 from .reversal.model import (
     CascadeReport,
@@ -81,6 +82,7 @@ from .reversal.registry import InverseRegistry
 ApprovalHook = Callable[[str, dict[str, Any], Principal, Decision], bool]
 
 STAGE_ENFORCE = "enforce"
+STAGE_BUDGET = "budget"
 STAGE_REVERSAL = "reversal"
 STAGE_AUTHORITY = "authority"
 STAGE_DETECT = "detect"
@@ -113,6 +115,7 @@ class Verdict:
     effective_args: dict[str, Any] = field(default_factory=dict)
     ledger_seq: int | None = None
     approved_by_human: bool = False
+    budget_charge: Charge | None = None
 
     @property
     def human_root(self) -> str | None:
@@ -143,6 +146,7 @@ class Verdict:
             "human_root": self.human_root,
             "approved_by_human": self.approved_by_human,
             "max_severity": self.max_severity,
+            "budget_charge": self.budget_charge.to_dict() if self.budget_charge else None,
             "findings": self.findings,
             "chain": self.chain.to_dict() if self.chain else None,
             "gate_decision": self.gate_decision.to_dict() if self.gate_decision else None,
@@ -169,6 +173,8 @@ class ControlPlane:
         inverse_registry: InverseRegistry | None = None,
         state_reader: StateReader | None = None,
         gate_evaluator: GateEvaluator | None = None,
+        irreversibility_budget: IrreversibilityBudget | None = None,
+        recoverability_register: Any | None = None,
         session_store: SessionStore | None = None,
         scanner: ThreatScanner | None = None,
         detector: DetectionEngine | None = None,
@@ -177,10 +183,16 @@ class ControlPlane:
     ) -> None:
         self.ledger = Ledger()
         self.authority = AuthorityEngine(on_event=self._on_authority_event)
+        # When a register is supplied, a declared reversibility only survives while
+        # a recent drill proves it. See praetor.drills.
+        self.recoverability = recoverability_register
         self.reversal = ReversalEngine(
             inverse_registry or InverseRegistry(),
             state_reader=state_reader,
             gate_evaluator=gate_evaluator,
+            classify_hook=(
+                recoverability_register.classify_hook if recoverability_register else None
+            ),
             on_event=self._on_reversal_event,
         )
         self.gate = PolicyEngine(
@@ -190,6 +202,10 @@ class ControlPlane:
         )
         self.detector = detector or DetectionEngine()
         self.approval_hook = approval_hook or _deny_by_default
+        # Optional. Without one, unrecoverable exposure is detected after the fact
+        # (PRA01) but never capped — which the containment benchmark showed lets
+        # several one-way actions land before the pattern is visible.
+        self.budget = irreversibility_budget
         self.fail_closed = fail_closed
 
         self._actor_strikes: dict[str, int] = {}
@@ -370,6 +386,52 @@ class ControlPlane:
             )
             return self._finalize(verdict, args)
 
+        # -- stage 1b: irreversibility budget -------------------------------
+        # Placed after the gate so a call the policy already refused does not
+        # consume or refuse budget, and before planning so the refusal costs no
+        # snapshot round-trip. Scoped to the delegation because that is the unit a
+        # human authorized and therefore the unit they should be asked to renew.
+        budget_charge: Charge | None = None
+        if self.budget is not None:
+            spec = self.reversal.registry.get(tool)
+            ok, budget_charge, budget_reason = self.budget.check(
+                delegation_id,
+                tool=tool,
+                kind=reversibility,
+                risk=risk,
+                has_residue=bool(spec and spec.residue),
+            )
+            if not ok:
+                record = self.authority.record_action(
+                    actor_private_key=actor_private_key,
+                    actor_id=actor_id,
+                    delegation_id=delegation_id,
+                    tool=tool,
+                    action=action,
+                    risk=risk,
+                    description=description or f"{action} {tool}",
+                    params=args,
+                    session_id=session_id,
+                    reversal_plan_id=None,
+                    now=when,
+                )
+                verdict = Verdict(
+                    action_id=record.id,
+                    allowed=False,
+                    stage=STAGE_BUDGET,
+                    effect=Effect.DENY,
+                    reason=budget_reason,
+                    tool=tool,
+                    action=action,
+                    risk=risk,
+                    reversibility=reversibility,
+                    gate_decision=decision,
+                    effective_args={},
+                    approved_by_human=approved_by_human,
+                    budget_charge=budget_charge,
+                )
+                return self._finalize(verdict, args)
+
         # -- stage 2: plan the undo (before the action runs) ---------------
         plan = self.reversal.plan(tool, args, now=when)
 
@@ -429,6 +491,7 @@ class ControlPlane:
         verdict = Verdict(
             action_id=record.id,
             allowed=allowed,
+            budget_charge=budget_charge,
             stage=stage,
             effect=decision.effect if allowed else Effect.DENY,
             reason=reason,
@@ -554,6 +617,13 @@ class ControlPlane:
                 verdict.gate_decision,
                 self._session_of(verdict.action_id),
             )
+        # Debit unrecoverable exposure only now. Charging at authorization time
+        # would let a flapping integration exhaust the ceiling without ever having
+        # changed anything.
+        if self.budget is not None and verdict.budget_charge is not None:
+            rec = self.authority.get_action(verdict.action_id)
+            if rec is not None:
+                self.budget.commit(rec.delegation_id, verdict.budget_charge)
         verdict.plan = entry.plan
         return entry
 
@@ -576,6 +646,14 @@ class ControlPlane:
                     verdict.gate_decision,
                     self._session_of(action_id),
                 )
+            # Exposure that was actually undone is no longer exposure. Refunding it
+            # is what makes the budget cooperate with the reversal layer rather than
+            # compete with it: an agent that repairs its own mess recovers headroom,
+            # so the incentive points at cleaning up instead of hoarding credit.
+            if self.budget is not None and verdict is not None and verdict.budget_charge:
+                rec = self.authority.get_action(action_id)
+                if rec is not None:
+                    self.budget.refund(rec.delegation_id, verdict.budget_charge)
         return receipt
 
     def undo_all(

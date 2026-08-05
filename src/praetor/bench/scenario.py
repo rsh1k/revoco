@@ -178,6 +178,11 @@ class Scenario:
     # "surprising", which is the difference between a report you can act on and a
     # wall of red.
     expect_outcome: Outcome | None = None
+    # Ceiling on unrecoverable exposure for this scenario's grant, in
+    # irreversible-actions-at-full-risk. Left off by default so the corpus measures
+    # what detection alone achieves, which is what makes the budget's effect
+    # attributable rather than baked into the baseline.
+    irreversibility_ceiling: float | None = None
     notes: str = ""
 
     @property

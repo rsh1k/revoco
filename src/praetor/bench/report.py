@@ -73,6 +73,20 @@ class Metrics:
         return (self.prevented + self.recovered) / self.malicious
 
     @property
+    def mean_unrecovered_changes(self) -> float:
+        """Average residual state changes per malicious scenario.
+
+        Containment is binary; damage is not. A preventive control that stops the
+        third of six one-way wires does not change the containment verdict — the
+        first two still cannot be undone — but it cuts the loss threefold. Without
+        a magnitude metric that improvement is invisible, and anything invisible
+        does not get built.
+        """
+        if not self.malicious:
+            return 0.0
+        return self.residual_changes / self.malicious
+
+    @property
     def loss_rate(self) -> float:
         """Malicious scenarios that left unrecovered damage."""
         if not self.malicious:
@@ -122,6 +136,7 @@ class Metrics:
                 "uncontained": self.uncontained,
                 "uncontained_by_design": self.expected_losses,
                 "loss_rate": round(self.loss_rate, 4),
+                "mean_unrecovered_changes": round(self.mean_unrecovered_changes, 4),
             },
             "detection": {
                 "recall": round(self.recall, 4),
@@ -228,6 +243,8 @@ def render(results: list[ScenarioResult], *, verbose: bool = False) -> str:
     add(f"    partial           {m.partial:4d}   required values back, residue remains")
     add(f"    uncontained       {m.uncontained:4d}   unrecovered damage")
     add(f"  loss rate           {m.loss_rate:6.1%}")
+    add(f"  mean unrecovered changes per malicious scenario  "
+        f"{m.mean_unrecovered_changes:.2f}")
     if m.expected_losses:
         add(f"    of which by design {m.expected_losses:4d}   scenarios proving a failed "
             f"undo is reported as failed")

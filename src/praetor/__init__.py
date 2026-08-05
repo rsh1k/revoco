@@ -60,6 +60,15 @@ from .controlplane import ControlPlane, Verdict
 from .core import crypto, ids
 from .core.errors import PraetorError
 from .detect import DetectionEngine, Finding, Severity, journal_health
+from .drills import (
+    Canary,
+    DrillOutcome,
+    DrillResult,
+    DrillRunner,
+    RecoverabilityAttestation,
+    RecoverabilityRegister,
+    attest,
+)
 from .evidence import EvidencePack, build_evidence_pack, readiness_report
 from .gate import Decision, Effect, Policy, PolicyEngine, load_policy, starter_policy
 from .ledger import Ledger, LedgerEntry
@@ -77,6 +86,7 @@ from .reversal import (
     Reversibility,
     ap_starter_registry,
 )
+from .reversal.budget import IrreversibilityBudget
 
 __version__ = "0.1.0"
 
@@ -84,6 +94,16 @@ __all__ = [
     "__version__",
     # control plane
     "ControlPlane",
+    # unrecoverable-exposure ceiling
+    "IrreversibilityBudget",
+    # recovery drills: reversibility as a claim that expires
+    "DrillRunner",
+    "Canary",
+    "DrillOutcome",
+    "DrillResult",
+    "RecoverabilityRegister",
+    "RecoverabilityAttestation",
+    "attest",
     "Verdict",
     # authority
     "Scope",

@@ -32,6 +32,7 @@ from typing import Any
 from ..controlplane import ControlPlane
 from ..core import crypto
 from ..gate.policy import Policy, load_policy
+from ..reversal.budget import IrreversibilityBudget
 from ..reversal.model import GateContext
 from ..reversal.registry import InverseRegistry
 from .scenario import (
@@ -128,8 +129,14 @@ class Harness:
             # are measuring the control plane, not the integrator's gate coverage.
             return scenario.gate_answers.get(ctx.gate.name, True)
 
+        budget = (
+            IrreversibilityBudget(scenario.irreversibility_ceiling)
+            if scenario.irreversibility_ceiling is not None
+            else None
+        )
         cp = ControlPlane(
             policy=scenario.policy or self.policy,
+            irreversibility_budget=budget,
             inverse_registry=registry,
             state_reader=world.state_reader,
             gate_evaluator=gate_evaluator,
