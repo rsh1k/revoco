@@ -153,6 +153,18 @@ jobs:
         if: steps.exists.outputs.already == 'false'
         run: uvx twine check dist/*
 
+      - name: Publish to PyPI
+        if: steps.exists.outputs.already == 'false'
+        uses: pypa/gh-action-pypi-publish@release/v1
+        # No `password:` — Trusted Publishing authenticates with the OIDC token
+        # granted by `id-token: write` above. Requires a one-time publisher
+        # configured on PyPI; see docs/RELEASING.md.
+
+      # Ordering matters: PyPI is the irreversible step, so it happens first. An
+      # earlier version bumped and tagged before publishing, so a failed publish
+      # left a tag and a consumed version number pointing at a release that never
+      # existed. Publishing first means a failure burns nothing and a retry can
+      # reuse the same version.
       - name: Commit and tag the bump
         if: steps.exists.outputs.already == 'false'
         env:
@@ -167,13 +179,6 @@ jobs:
           git commit -m "Release v$VERSION [skip release]"
           git tag -a "v$VERSION" -m "v$VERSION"
           git push origin HEAD:main --follow-tags
-
-      - name: Publish to PyPI
-        if: steps.exists.outputs.already == 'false'
-        uses: pypa/gh-action-pypi-publish@release/v1
-        # No `password:` — Trusted Publishing authenticates with the OIDC token
-        # granted by `id-token: write` above. Requires a one-time publisher
-        # configured on PyPI; see docs/RELEASING.md.
 
       - name: GitHub release
         if: steps.exists.outputs.already == 'false'
