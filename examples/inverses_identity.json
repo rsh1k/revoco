@@ -1,0 +1,251 @@
+{
+  "specs": [
+    {
+      "arg_map": {
+        "id": "args.id"
+      },
+      "degraded_kind": "irreversible",
+      "gates": [
+        {
+          "check_at": "authorize",
+          "description": "The object type must be one that Entra soft-deletes: users, Microsoft 365 groups, cloud security groups, or app registrations. Other types \u2014 distribution groups among them \u2014 are hard deleted immediately.",
+          "name": "entra_object_type_soft_deletes",
+          "remediation": "For hard-deleting types there is no undo. Deny agent deletion of them outright, or require approval, rather than relying on a restore that does not exist."
+        },
+        {
+          "check_at": "undo",
+          "description": "The object must still be within its 30-day soft-delete window and not already permanently removed.",
+          "name": "entra_object_still_in_soft_delete",
+          "remediation": "After 30 days neither you nor Microsoft Support can restore it; the object must be recreated, with a new object id and all references rewritten."
+        },
+        {
+          "check_at": "undo",
+          "description": "Restoring an identity restores access. A human must confirm the account was deleted or disabled by mistake rather than in response to a compromise.",
+          "name": "identity_restore_is_intended",
+          "remediation": "Route this to the on-call identity owner. An automated cascade must never silently re-enable credentials it cannot vouch for."
+        }
+      ],
+      "inverse_tool": "entra.directoryobject.restore",
+      "kind": "compensable",
+      "notes": "A genuine time window, so window_seconds is correct here \u2014 30 days, not customizable. This is the rare case where the clock-based model fits, which is worth noting given how often it does not.",
+      "one_shot": false,
+      "residue": "The object comes back with its id and properties, but licence assignments and some application assignments may need reapplying, and anything that failed for the user during the deleted interval stays failed. Downstream systems provisioned from Entra may have already deprovisioned the account.",
+      "snapshot_fields": [
+        "userPrincipalName",
+        "displayName",
+        "accountEnabled",
+        "assignedLicenses"
+      ],
+      "static_args": {},
+      "steps": [],
+      "tool": "entra.user.delete",
+      "window_seconds": 2592000.0
+    },
+    {
+      "arg_map": {
+        "id": "args.id"
+      },
+      "degraded_kind": "irreversible",
+      "gates": [
+        {
+          "check_at": "authorize",
+          "description": "The object type must be one that Entra soft-deletes: users, Microsoft 365 groups, cloud security groups, or app registrations. Other types \u2014 distribution groups among them \u2014 are hard deleted immediately.",
+          "name": "entra_object_type_soft_deletes",
+          "remediation": "For hard-deleting types there is no undo. Deny agent deletion of them outright, or require approval, rather than relying on a restore that does not exist."
+        },
+        {
+          "check_at": "undo",
+          "description": "The object must still be within its 30-day soft-delete window and not already permanently removed.",
+          "name": "entra_object_still_in_soft_delete",
+          "remediation": "After 30 days neither you nor Microsoft Support can restore it; the object must be recreated, with a new object id and all references rewritten."
+        }
+      ],
+      "inverse_tool": "entra.directoryobject.restore",
+      "kind": "compensable",
+      "notes": "The authorize gate matters most here: Microsoft 365 and cloud security groups soft-delete, distribution groups do not. Same API verb, and one of them is unrecoverable.",
+      "one_shot": false,
+      "residue": "The group and its membership return, but access granted through it was absent for the whole deleted interval, and any conditional-access or licensing behaviour keyed on it behaved as though the group did not exist.",
+      "snapshot_fields": [
+        "displayName",
+        "groupTypes",
+        "securityEnabled",
+        "mailEnabled"
+      ],
+      "static_args": {},
+      "steps": [],
+      "tool": "entra.group.delete",
+      "window_seconds": 2592000.0
+    },
+    {
+      "arg_map": {
+        "groupId": "args.groupId",
+        "memberId": "args.memberId"
+      },
+      "degraded_kind": "irreversible",
+      "gates": [],
+      "inverse_tool": "entra.group.remove_member",
+      "kind": "reversible",
+      "notes": "Privilege escalation via group membership is exactly reversible, which makes it the cheap case. Note the asymmetry with removal below.",
+      "one_shot": false,
+      "residue": "",
+      "snapshot_fields": [],
+      "static_args": {},
+      "steps": [],
+      "tool": "entra.group.add_member",
+      "window_seconds": null
+    },
+    {
+      "arg_map": {
+        "groupId": "args.groupId",
+        "memberId": "args.memberId"
+      },
+      "degraded_kind": "irreversible",
+      "gates": [],
+      "inverse_tool": "entra.group.add_member",
+      "kind": "reversible",
+      "notes": "The lockout direction. Reversible, but membership removal may have triggered downstream deprovisioning that adding the member back does not reverse.",
+      "one_shot": false,
+      "residue": "",
+      "snapshot_fields": [],
+      "static_args": {},
+      "steps": [],
+      "tool": "entra.group.remove_member",
+      "window_seconds": null
+    },
+    {
+      "arg_map": {
+        "id": "result.id"
+      },
+      "degraded_kind": "irreversible",
+      "gates": [],
+      "inverse_tool": "entra.roleassignment.delete",
+      "kind": "reversible",
+      "notes": "An agent granting itself or another principal a directory role is the highest-consequence write on this surface. Exactly reversible, and still the one to require approval on \u2014 by the time you undo it, the elevated principal has already been able to act.",
+      "one_shot": false,
+      "residue": "",
+      "snapshot_fields": [],
+      "static_args": {},
+      "steps": [],
+      "tool": "entra.roleassignment.create",
+      "window_seconds": null
+    },
+    {
+      "arg_map": {
+        "accountEnabled": "snapshot.accountEnabled",
+        "displayName": "snapshot.displayName",
+        "id": "args.id",
+        "userPrincipalName": "snapshot.userPrincipalName"
+      },
+      "degraded_kind": "irreversible",
+      "gates": [],
+      "inverse_tool": "entra.user.update",
+      "kind": "reversible",
+      "notes": "Covers the disable case (accountEnabled=false), which is the *right* containment action on this surface precisely because it is cleanly reversible where deletion is not.",
+      "one_shot": false,
+      "residue": "",
+      "snapshot_fields": [
+        "accountEnabled",
+        "userPrincipalName",
+        "displayName"
+      ],
+      "static_args": {},
+      "steps": [],
+      "tool": "entra.user.update",
+      "window_seconds": null
+    },
+    {
+      "arg_map": {
+        "userId": "args.userId"
+      },
+      "degraded_kind": "irreversible",
+      "gates": [
+        {
+          "check_at": "undo",
+          "description": "Restoring an identity restores access. A human must confirm the account was deleted or disabled by mistake rather than in response to a compromise.",
+          "name": "identity_restore_is_intended",
+          "remediation": "Route this to the on-call identity owner. An automated cascade must never silently re-enable credentials it cannot vouch for."
+        }
+      ],
+      "inverse_tool": "okta.user.reactivate",
+      "kind": "compensable",
+      "notes": "The documented deactivate/group-rule interaction is the trap on this surface. An undo written from intuition rather than from the docs would get it wrong in the direction of granting extra access.",
+      "one_shot": false,
+      "residue": "Reactivation restores the account but some application assignments may need to be reassigned. Group memberships were never removed \u2014 Okta does not re-evaluate group rules on deactivation \u2014 so they need no restoration and any attempt to 'restore' them would add memberships that were never lost.",
+      "snapshot_fields": [
+        "status"
+      ],
+      "static_args": {},
+      "steps": [],
+      "tool": "okta.user.deactivate",
+      "window_seconds": null
+    },
+    {
+      "arg_map": {},
+      "degraded_kind": "irreversible",
+      "gates": [],
+      "inverse_tool": null,
+      "kind": "irreversible",
+      "notes": "Deletion in Okta follows deactivation and is permanent. This is why the two are separate tools here: policy should permit deactivate freely and gate delete behind a human, because only one of them has an undo.",
+      "one_shot": false,
+      "residue": "",
+      "snapshot_fields": [],
+      "static_args": {},
+      "steps": [],
+      "tool": "okta.user.delete",
+      "window_seconds": null
+    },
+    {
+      "arg_map": {
+        "groupId": "args.groupId",
+        "userId": "args.userId"
+      },
+      "degraded_kind": "irreversible",
+      "gates": [],
+      "inverse_tool": "okta.group.remove_user",
+      "kind": "reversible",
+      "notes": "",
+      "one_shot": false,
+      "residue": "",
+      "snapshot_fields": [],
+      "static_args": {},
+      "steps": [],
+      "tool": "okta.group.add_user",
+      "window_seconds": null
+    },
+    {
+      "arg_map": {
+        "groupId": "args.groupId",
+        "userId": "args.userId"
+      },
+      "degraded_kind": "irreversible",
+      "gates": [],
+      "inverse_tool": "okta.group.add_user",
+      "kind": "reversible",
+      "notes": "",
+      "one_shot": false,
+      "residue": "",
+      "snapshot_fields": [],
+      "static_args": {},
+      "steps": [],
+      "tool": "okta.group.remove_user",
+      "window_seconds": null
+    },
+    {
+      "arg_map": {
+        "policyId": "args.policyId"
+      },
+      "degraded_kind": "irreversible",
+      "gates": [],
+      "inverse_tool": "okta.policy.activate",
+      "kind": "reversible",
+      "notes": "An agent deactivating an MFA or sign-on policy is a security control being switched off. Technically reversible; every sign-in during the gap happened under the weaker policy and cannot be re-evaluated.",
+      "one_shot": false,
+      "residue": "",
+      "snapshot_fields": [],
+      "static_args": {},
+      "steps": [],
+      "tool": "okta.policy.deactivate",
+      "window_seconds": null
+    }
+  ]
+}

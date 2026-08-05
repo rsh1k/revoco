@@ -1,0 +1,282 @@
+{
+  "specs": [
+    {
+      "arg_map": {},
+      "degraded_kind": "irreversible",
+      "gates": [],
+      "inverse_tool": "sap.noop",
+      "kind": "reversible",
+      "notes": "A read changes nothing, so its undo is trivially complete.",
+      "one_shot": false,
+      "residue": "",
+      "snapshot_fields": [],
+      "static_args": {},
+      "steps": [],
+      "tool": "sap.journalentry.read",
+      "window_seconds": null
+    },
+    {
+      "arg_map": {},
+      "degraded_kind": "irreversible",
+      "gates": [],
+      "inverse_tool": "sap.noop",
+      "kind": "reversible",
+      "notes": "Reading supplier bank data triggers SAP Read Access Logging where configured. The read is free to undo but not free to perform.",
+      "one_shot": false,
+      "residue": "",
+      "snapshot_fields": [],
+      "static_args": {},
+      "steps": [],
+      "tool": "sap.supplier.read",
+      "window_seconds": null
+    },
+    {
+      "arg_map": {
+        "AccountingDocument": "result.AccountingDocument",
+        "CompanyCode": "args.CompanyCode",
+        "FiscalYear": "result.FiscalYear",
+        "ReversalReason": "const:01"
+      },
+      "degraded_kind": "irreversible",
+      "gates": [
+        {
+          "check_at": "undo",
+          "description": "The accounting period of the document being reversed must be open. A reversal posted into a closed period is rejected.",
+          "name": "sap_period_open",
+          "remediation": "Either reopen the period (OB52 / Manage Posting Periods), or post the reversal to the current open period and accept that the reversal lands in a different period from the original."
+        },
+        {
+          "check_at": "undo",
+          "description": "The document must have no already-cleared line items, or the clearing must have been reset first. SAP refuses a reversal that would need to clear an item another process already cleared.",
+          "name": "sap_items_not_cleared",
+          "remediation": "Reset the clearing with FBRA before attempting the reversal."
+        }
+      ],
+      "inverse_tool": "sap.journalentry.reverse",
+      "kind": "compensable",
+      "notes": "ReversalReason drives the posting date rule: reason 01 as delivered permits only the original posting date, so a reversal in a closed period requires a reason configured to allow an alternative date. Pick the reason your finance team has configured \u2014 this default is a placeholder, not a recommendation.",
+      "one_shot": true,
+      "residue": "Reversal creates a second, offsetting document; the original posting remains permanently in the ledger and in every report already run against it. If the original period has closed, the reversal posts to a later period, so both periods' figures move. The reversal document cannot itself be reversed.",
+      "snapshot_fields": [],
+      "static_args": {},
+      "steps": [],
+      "tool": "sap.journalentry.post",
+      "window_seconds": null
+    },
+    {
+      "arg_map": {},
+      "degraded_kind": "irreversible",
+      "gates": [],
+      "inverse_tool": null,
+      "kind": "irreversible",
+      "notes": "Registered deliberately. A reversal document cannot be reversed; correcting a mistaken reversal needs a fresh manual posting (F-02). Classifying it as irreversible means an agent calling reverse directly escalates to a human under the starter policy, instead of inheriting the illusion that reversal is always safe.",
+      "one_shot": false,
+      "residue": "",
+      "snapshot_fields": [],
+      "static_args": {},
+      "steps": [],
+      "tool": "sap.journalentry.reverse",
+      "window_seconds": null
+    },
+    {
+      "arg_map": {
+        "AccountingDocument": "result.AccountingDocument",
+        "CompanyCode": "args.CompanyCode",
+        "FiscalYear": "result.FiscalYear"
+      },
+      "degraded_kind": "irreversible",
+      "gates": [],
+      "inverse_tool": "sap.journalentry.delete_parked",
+      "kind": "reversible",
+      "notes": "The useful contrast: a *parked* document has not posted, so deleting it is a true inverse with no ledger trace. Routing agent postings through park-then-human-post is the cheapest way to convert an irreversible surface into a reversible one.",
+      "one_shot": false,
+      "residue": "",
+      "snapshot_fields": [],
+      "static_args": {},
+      "steps": [],
+      "tool": "sap.journalentry.park",
+      "window_seconds": null
+    },
+    {
+      "arg_map": {
+        "BankAccount": "snapshot.BankAccount",
+        "BankControlKey": "snapshot.BankControlKey",
+        "BankCountryKey": "snapshot.BankCountryKey",
+        "BankIdentification": "args.BankIdentification",
+        "BankNumber": "snapshot.BankNumber",
+        "BusinessPartner": "args.BusinessPartner",
+        "IBAN": "snapshot.IBAN"
+      },
+      "degraded_kind": "irreversible",
+      "gates": [
+        {
+          "check_at": "undo",
+          "description": "Where supplier bank fields are configured as sensitive, restoring them re-triggers dual-control confirmation. Until a second person confirms, the supplier is blocked for payment.",
+          "name": "sap_bank_dual_control_confirmable",
+          "remediation": "Ensure a confirmer is available (FK08 / Confirm Supplier List), or accept that the supplier stays payment-blocked until they are."
+        }
+      ],
+      "inverse_tool": "sap.supplier.bank.update",
+      "kind": "reversible",
+      "notes": "THE spec to get right. Writing back the captured prior values restores state exactly, which is why this fraud pattern is recoverable at all \u2014 but only if the prior values were captured before the write. SAP's own change log is not a dependable fallback here: sensitive bank fields can log as '*** Deleted ***' (KBA 3475932), FK08 may omit sensitive-field changes (KBA 2518672), and vendor bank updates have been reported missing from change logs entirely (KBA 2518878). Restoring also writes a new CDHDR/CDPOS record, so the audit trail shows two changes rather than none.",
+      "one_shot": false,
+      "residue": "",
+      "snapshot_fields": [
+        "BankCountryKey",
+        "BankNumber",
+        "BankAccount",
+        "BankControlKey",
+        "IBAN"
+      ],
+      "static_args": {
+        "_praetor_reason": "restore prior banking details"
+      },
+      "steps": [],
+      "tool": "sap.supplier.bank.update",
+      "window_seconds": null
+    },
+    {
+      "arg_map": {
+        "BankIdentification": "args.BankIdentification",
+        "BusinessPartner": "args.BusinessPartner"
+      },
+      "degraded_kind": "irreversible",
+      "gates": [
+        {
+          "check_at": "undo",
+          "description": "Where supplier bank fields are configured as sensitive, restoring them re-triggers dual-control confirmation. Until a second person confirms, the supplier is blocked for payment.",
+          "name": "sap_bank_dual_control_confirmable",
+          "remediation": "Ensure a confirmer is available (FK08 / Confirm Supplier List), or accept that the supplier stays payment-blocked until they are."
+        }
+      ],
+      "inverse_tool": "sap.supplier.bank.delete",
+      "kind": "compensable",
+      "notes": "Note for IDoc-based landscapes: DEBMAS/CREMAS do not delete bank details (KBA 3344959), so an IDoc-driven 'undo' silently leaves the account in place. Use the API or a direct maintenance path, and verify removal rather than assuming it.",
+      "one_shot": false,
+      "residue": "The bank-details record is removed but the change history retains evidence that the account existed. Any payment proposal built while it existed must be re-checked separately.",
+      "snapshot_fields": [],
+      "static_args": {},
+      "steps": [],
+      "tool": "sap.supplier.bank.create",
+      "window_seconds": null
+    },
+    {
+      "arg_map": {
+        "BusinessPartner": "args.BusinessPartner",
+        "PaymentBlock": "snapshot.PaymentBlock",
+        "PostingBlock": "snapshot.PostingBlock"
+      },
+      "degraded_kind": "irreversible",
+      "gates": [],
+      "inverse_tool": "sap.supplier.set_block",
+      "kind": "reversible",
+      "notes": "Blocking is reversible and cheap, which makes it the right *containment* action for an agent-driven incident: block first, then work out what to reverse.",
+      "one_shot": false,
+      "residue": "",
+      "snapshot_fields": [
+        "PostingBlock",
+        "PaymentBlock"
+      ],
+      "static_args": {},
+      "steps": [],
+      "tool": "sap.supplier.block",
+      "window_seconds": null
+    },
+    {
+      "arg_map": {},
+      "degraded_kind": "irreversible",
+      "gates": [
+        {
+          "check_at": "undo",
+          "description": "The outbound payment must not have settled at the bank. Once funds have left, voiding the payment medium changes the ledger but not reality.",
+          "name": "sap_payment_not_settled",
+          "remediation": "Confirm against the bank statement / payment status before reversing. If settled, this is a recovery matter for treasury, not a rollback."
+        },
+        {
+          "check_at": "undo",
+          "description": "The accounting period of the document being reversed must be open. A reversal posted into a closed period is rejected.",
+          "name": "sap_period_open",
+          "remediation": "Either reopen the period (OB52 / Manage Posting Periods), or post the reversal to the current open period and accept that the reversal lands in a different period from the original."
+        }
+      ],
+      "inverse_tool": null,
+      "kind": "compensable",
+      "notes": "The canonical sequenced undo, and the reason InverseStep exists. If your landscape issues no payment media, drop the void step; if it issues them asynchronously, the void may need its own gate.",
+      "one_shot": true,
+      "residue": "The remittance advice already sent to the supplier is not recalled. The payment appears as a void rather than an absence on the bank statement, and the cheque number is consumed. If the funds already settled, none of this returns the money \u2014 it only corrects the books.",
+      "snapshot_fields": [],
+      "static_args": {},
+      "steps": [
+        {
+          "arg_map": {
+            "CompanyCode": "args.CompanyCode",
+            "FiscalYear": "result.FiscalYear",
+            "PaymentDocument": "result.PaymentDocument"
+          },
+          "critical": true,
+          "description": "Void the cheque or payment medium FIRST. If a medium was issued and this is skipped, the ledger and the bank statement disagree the moment clearing is reset.",
+          "name": "void_medium",
+          "static_args": {},
+          "tool": "sap.paymentmedium.void"
+        },
+        {
+          "arg_map": {
+            "ClearingDocument": "result.PaymentDocument",
+            "CompanyCode": "args.CompanyCode",
+            "FiscalYear": "result.FiscalYear"
+          },
+          "critical": true,
+          "description": "FBRA. A reversal cannot be posted against cleared items, so the clearing must be reset before FB08 will accept the document. FBRA can also reset-and-reverse in one action; these are kept separate so a partial failure names the step it stopped at.",
+          "name": "reset_clearing",
+          "static_args": {},
+          "tool": "sap.clearing.reset"
+        },
+        {
+          "arg_map": {
+            "AccountingDocument": "result.PaymentDocument",
+            "CompanyCode": "args.CompanyCode",
+            "FiscalYear": "result.FiscalYear",
+            "ReversalReason": "const:01"
+          },
+          "critical": true,
+          "description": "FB08. Posts the offsetting document.",
+          "name": "reverse_document",
+          "static_args": {},
+          "tool": "sap.journalentry.reverse"
+        }
+      ],
+      "tool": "sap.payment.post",
+      "window_seconds": null
+    },
+    {
+      "arg_map": {},
+      "degraded_kind": "irreversible",
+      "gates": [],
+      "inverse_tool": null,
+      "kind": "irreversible",
+      "notes": "F110 in anger. A payment run can produce hundreds of payment documents and a transmitted payment file in one action, so there is no single inverse \u2014 recovery means reversing each resulting document individually, assuming the file has not gone to the bank. Classified irreversible so policy forces a human onto the run itself, which is where the control belongs.",
+      "one_shot": false,
+      "residue": "",
+      "snapshot_fields": [],
+      "static_args": {},
+      "steps": [],
+      "tool": "sap.paymentrun.execute",
+      "window_seconds": null
+    },
+    {
+      "arg_map": {},
+      "degraded_kind": "irreversible",
+      "gates": [],
+      "inverse_tool": null,
+      "kind": "irreversible",
+      "notes": "Once the file is with the bank, this system has no inverse to offer.",
+      "one_shot": false,
+      "residue": "",
+      "snapshot_fields": [],
+      "static_args": {},
+      "steps": [],
+      "tool": "sap.paymentfile.transmit",
+      "window_seconds": null
+    }
+  ]
+}

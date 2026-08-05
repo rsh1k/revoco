@@ -1,0 +1,79 @@
+# Inverse-operation registry: how to undo each tool.
+#
+# THIS FILE IS THE PART THAT DOES NOT GENERALIZE. Argument names, window values,
+# and the choice between "correct" and "rescind" semantics are specific to each
+# system of record, and getting one wrong produces a confident, wrong rollback —
+# worse than having none. Validate against your own system before production.
+#
+#   praetor inverses-check examples/inverses.yaml
+#   praetor coverage examples/inverses.yaml --tools invoices.pay,vendors.update
+#
+# Argument sources for arg_map:
+#   args.<path>      from the forward call's arguments
+#   snapshot.<path>  from prior state captured BEFORE the action ran
+#   result.<path>    from the forward call's return value (bound on confirm)
+#   const:<value>    a literal
+
+specs:
+  # --- exact inverses -----------------------------------------------------
+
+  # Restoring prior banking details is a true inverse, which is why
+  # vendor-master tampering is recoverable at all. This one spec covers the most
+  # common agent-assisted payment-fraud pattern.
+  - tool: vendors.update
+    kind: reversible
+    inverse_tool: vendors.update
+    snapshot_fields: [bank_account, remit_to]
+    arg_map:
+      vendor_id: args.vendor_id
+      bank_account: snapshot.bank_account
+      remit_to: snapshot.remit_to
+
+  - tool: invoices.approve
+    kind: reversible
+    inverse_tool: invoices.set_status
+    snapshot_fields: [status]
+    arg_map:
+      invoice_id: args.invoice_id
+      status: snapshot.status
+
+  # --- compensating actions ----------------------------------------------
+  # Not inverses. 'residue' is mandatory here: an unnamed side effect is an
+  # unowned risk, and people delegate more freely when they believe an undo is
+  # complete.
+
+  - tool: invoices.pay
+    kind: compensable
+    inverse_tool: invoices.void_payment
+    snapshot_fields: [status, paid_amount, payment_id]
+    window_seconds: 86400        # most rails settle within a day; after that, no void
+    arg_map:
+      payment_id: result.payment_id
+      invoice_id: args.invoice_id
+      reason: "const:reversed by praetor control plane"
+    residue: >-
+      The remittance advice already sent to the supplier is not recalled, and the
+      payment appears as a void rather than an absence on the bank statement.
+
+  - tool: vendors.create
+    kind: compensable
+    inverse_tool: vendors.deactivate
+    arg_map:
+      vendor_id: result.vendor_id
+    residue: >-
+      The vendor record is deactivated, not deleted: the vendor number is
+      consumed and remains visible in the master-data audit history.
+
+  # --- irreversible -------------------------------------------------------
+  # No inverse_tool, deliberately. Modeling "send a correction" as an undo would
+  # be a lie the policy layer would then rely on. Under the starter policy these
+  # escalate to human approval.
+
+  - tool: email.send
+    kind: irreversible
+
+  - tool: payments.wire
+    kind: irreversible
+
+  - tool: filings.submit
+    kind: irreversible

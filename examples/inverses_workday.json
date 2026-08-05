@@ -1,0 +1,272 @@
+{
+  "specs": [
+    {
+      "arg_map": {},
+      "degraded_kind": "irreversible",
+      "gates": [],
+      "inverse_tool": "workday.noop",
+      "kind": "reversible",
+      "notes": "A read changes nothing.",
+      "one_shot": false,
+      "residue": "",
+      "snapshot_fields": [],
+      "static_args": {},
+      "steps": [],
+      "tool": "workday.worker.read",
+      "window_seconds": null
+    },
+    {
+      "arg_map": {
+        "Business_Process_Reference": "result.Business_Process_Reference",
+        "Comment": "const:rescinded by praetor control plane"
+      },
+      "degraded_kind": "irreversible",
+      "gates": [
+        {
+          "check_at": "undo",
+          "description": "The business process must be in Successfully Completed status and must expose the Rescind action to the caller's security groups.",
+          "name": "workday_bp_rescindable",
+          "remediation": "Check the process status and that the actor holds a role with Rescind permission (typically Business Process Administrator) for this process type."
+        },
+        {
+          "check_at": "undo",
+          "description": "Payroll must not have completed over the period this change affects. Once it has, the change is no longer rescindable regardless of how recent it is.",
+          "name": "workday_payroll_not_run",
+          "remediation": "If payroll has run, this is a payroll-correction matter (retro processing / off-cycle adjustment), not a rollback. Escalate to a payroll partner."
+        },
+        {
+          "check_at": "undo",
+          "description": "No later business process may depend on this one. Workday blocks a rescind whose effects a subsequent completed process relies on.",
+          "name": "workday_no_dependent_process",
+          "remediation": "Rescind the dependent processes first, newest to oldest. A cascade over the delegation subtree already runs in that order."
+        },
+        {
+          "check_at": "undo",
+          "description": "Outbound integrations must not have already published this change to downstream systems (payroll provider, badge system, benefits carrier). Rescinding in Workday does not retract what those systems received.",
+          "name": "workday_integrations_not_consumed",
+          "remediation": "Check integration event history for the period. If published, the downstream systems need their own correction \u2014 treat this as compensable, not reversed."
+        }
+      ],
+      "inverse_tool": "workday.bp.rescind",
+      "kind": "compensable",
+      "notes": "The snapshot is captured even though rescind does not need it, for two reasons: it lets an evidence pack state what the compensation actually was before the change, and it leaves a manual restore path if the rescind gate is closed and someone has to put the value back by hand.",
+      "one_shot": true,
+      "residue": "Rescinding reverses the data in Workday but does not retract what outbound integrations already published, so downstream systems (payroll provider, benefits carriers, provisioning) may still hold the change. The rescinded transaction remains visible in the worker's process history, and the rescind itself cannot be undone.",
+      "snapshot_fields": [
+        "Total_Base_Pay",
+        "Pay_Rate",
+        "Currency",
+        "Frequency"
+      ],
+      "static_args": {},
+      "steps": [],
+      "tool": "workday.compensation.request_change",
+      "window_seconds": null
+    },
+    {
+      "arg_map": {
+        "Business_Process_Reference": "result.Business_Process_Reference",
+        "Comment": "const:rescinded by praetor control plane"
+      },
+      "degraded_kind": "irreversible",
+      "gates": [
+        {
+          "check_at": "undo",
+          "description": "The business process must be in Successfully Completed status and must expose the Rescind action to the caller's security groups.",
+          "name": "workday_bp_rescindable",
+          "remediation": "Check the process status and that the actor holds a role with Rescind permission (typically Business Process Administrator) for this process type."
+        },
+        {
+          "check_at": "undo",
+          "description": "Payroll must not have completed over the period this change affects. Once it has, the change is no longer rescindable regardless of how recent it is.",
+          "name": "workday_payroll_not_run",
+          "remediation": "If payroll has run, this is a payroll-correction matter (retro processing / off-cycle adjustment), not a rollback. Escalate to a payroll partner."
+        },
+        {
+          "check_at": "undo",
+          "description": "No later business process may depend on this one. Workday blocks a rescind whose effects a subsequent completed process relies on.",
+          "name": "workday_no_dependent_process",
+          "remediation": "Rescind the dependent processes first, newest to oldest. A cascade over the delegation subtree already runs in that order."
+        }
+      ],
+      "inverse_tool": "workday.bp.rescind",
+      "kind": "compensable",
+      "notes": "",
+      "one_shot": true,
+      "residue": "Rescinding reverses the data in Workday but does not retract what outbound integrations already published, so downstream systems (payroll provider, benefits carriers, provisioning) may still hold the change. The rescinded transaction remains visible in the worker's process history, and the rescind itself cannot be undone.",
+      "snapshot_fields": [
+        "Position_ID",
+        "Job_Profile",
+        "Supervisory_Organization",
+        "Location"
+      ],
+      "static_args": {},
+      "steps": [],
+      "tool": "workday.job.change_job",
+      "window_seconds": null
+    },
+    {
+      "arg_map": {
+        "Business_Process_Reference": "result.Business_Process_Reference",
+        "Comment": "const:rescinded by praetor control plane"
+      },
+      "degraded_kind": "irreversible",
+      "gates": [
+        {
+          "check_at": "undo",
+          "description": "The business process must be in Successfully Completed status and must expose the Rescind action to the caller's security groups.",
+          "name": "workday_bp_rescindable",
+          "remediation": "Check the process status and that the actor holds a role with Rescind permission (typically Business Process Administrator) for this process type."
+        },
+        {
+          "check_at": "undo",
+          "description": "Payroll must not have completed over the period this change affects. Once it has, the change is no longer rescindable regardless of how recent it is.",
+          "name": "workday_payroll_not_run",
+          "remediation": "If payroll has run, this is a payroll-correction matter (retro processing / off-cycle adjustment), not a rollback. Escalate to a payroll partner."
+        },
+        {
+          "check_at": "undo",
+          "description": "No later business process may depend on this one. Workday blocks a rescind whose effects a subsequent completed process relies on.",
+          "name": "workday_no_dependent_process",
+          "remediation": "Rescind the dependent processes first, newest to oldest. A cascade over the delegation subtree already runs in that order."
+        },
+        {
+          "check_at": "undo",
+          "description": "Outbound integrations must not have already published this change to downstream systems (payroll provider, badge system, benefits carrier). Rescinding in Workday does not retract what those systems received.",
+          "name": "workday_integrations_not_consumed",
+          "remediation": "Check integration event history for the period. If published, the downstream systems need their own correction \u2014 treat this as compensable, not reversed."
+        }
+      ],
+      "inverse_tool": "workday.bp.rescind",
+      "kind": "compensable",
+      "notes": "",
+      "one_shot": true,
+      "residue": "Rescinding reverses the data in Workday but does not retract what outbound integrations already published, so downstream systems (payroll provider, benefits carriers, provisioning) may still hold the change. The rescinded transaction remains visible in the worker's process history, and the rescind itself cannot be undone. A rescinded hire also consumes the employee ID, and any account provisioned by an integration during the window needs separate deprovisioning.",
+      "snapshot_fields": [],
+      "static_args": {},
+      "steps": [],
+      "tool": "workday.staffing.hire",
+      "window_seconds": null
+    },
+    {
+      "arg_map": {
+        "Business_Process_Reference": "result.Business_Process_Reference",
+        "Comment": "const:rescinded by praetor control plane"
+      },
+      "degraded_kind": "irreversible",
+      "gates": [
+        {
+          "check_at": "undo",
+          "description": "The business process must be in Successfully Completed status and must expose the Rescind action to the caller's security groups.",
+          "name": "workday_bp_rescindable",
+          "remediation": "Check the process status and that the actor holds a role with Rescind permission (typically Business Process Administrator) for this process type."
+        },
+        {
+          "check_at": "undo",
+          "description": "Payroll must not have completed over the period this change affects. Once it has, the change is no longer rescindable regardless of how recent it is.",
+          "name": "workday_payroll_not_run",
+          "remediation": "If payroll has run, this is a payroll-correction matter (retro processing / off-cycle adjustment), not a rollback. Escalate to a payroll partner."
+        },
+        {
+          "check_at": "undo",
+          "description": "No later business process may depend on this one. Workday blocks a rescind whose effects a subsequent completed process relies on.",
+          "name": "workday_no_dependent_process",
+          "remediation": "Rescind the dependent processes first, newest to oldest. A cascade over the delegation subtree already runs in that order."
+        },
+        {
+          "check_at": "undo",
+          "description": "Outbound integrations must not have already published this change to downstream systems (payroll provider, badge system, benefits carrier). Rescinding in Workday does not retract what those systems received.",
+          "name": "workday_integrations_not_consumed",
+          "remediation": "Check integration event history for the period. If published, the downstream systems need their own correction \u2014 treat this as compensable, not reversed."
+        }
+      ],
+      "inverse_tool": "workday.bp.rescind",
+      "kind": "compensable",
+      "notes": "An agent-initiated termination is the highest-consequence write on this surface. Even though it is technically rescindable, treat it as an approval-required action in policy rather than relying on the undo.",
+      "one_shot": true,
+      "residue": "Rescinding reverses the data in Workday but does not retract what outbound integrations already published, so downstream systems (payroll provider, benefits carriers, provisioning) may still hold the change. The rescinded transaction remains visible in the worker's process history, and the rescind itself cannot be undone. Access revoked by downstream provisioning during the window is not automatically restored, and benefits events already triggered may need manual reversal.",
+      "snapshot_fields": [],
+      "static_args": {},
+      "steps": [],
+      "tool": "workday.staffing.terminate",
+      "window_seconds": null
+    },
+    {
+      "arg_map": {
+        "Comment": "const:corrected back by praetor control plane",
+        "Currency": "snapshot.Currency",
+        "Frequency": "snapshot.Frequency",
+        "Total_Base_Pay": "snapshot.Total_Base_Pay",
+        "Worker_Reference": "args.Worker_Reference"
+      },
+      "degraded_kind": "irreversible",
+      "gates": [
+        {
+          "check_at": "undo",
+          "description": "Payroll must not have completed over the period this change affects. Once it has, the change is no longer rescindable regardless of how recent it is.",
+          "name": "workday_payroll_not_run",
+          "remediation": "If payroll has run, this is a payroll-correction matter (retro processing / off-cycle adjustment), not a rollback. Escalate to a payroll partner."
+        }
+      ],
+      "inverse_tool": "workday.compensation.correct",
+      "kind": "compensable",
+      "notes": "Deliberately COMPENSABLE, not REVERSIBLE, even though the numeric value is restored exactly. What is not restored is the record of what happened, and for an evidence system that is the part that counts.",
+      "one_shot": false,
+      "residue": "Correct rewrites the record rather than reversing it. After correcting back, the effective-dated history reads as though the corrected value was always intended, with no visible reversal \u2014 a materially weaker audit position than a rescind, and the difference that matters in a dispute.",
+      "snapshot_fields": [
+        "Total_Base_Pay",
+        "Currency",
+        "Frequency"
+      ],
+      "static_args": {},
+      "steps": [],
+      "tool": "workday.compensation.correct",
+      "window_seconds": null
+    },
+    {
+      "arg_map": {},
+      "degraded_kind": "irreversible",
+      "gates": [],
+      "inverse_tool": null,
+      "kind": "irreversible",
+      "notes": "Registered deliberately. A rescind cannot be un-rescinded. If an agent can call rescind directly, that call needs a human on it \u2014 the undo button is itself a one-way door.",
+      "one_shot": false,
+      "residue": "",
+      "snapshot_fields": [],
+      "static_args": {},
+      "steps": [],
+      "tool": "workday.bp.rescind",
+      "window_seconds": null
+    },
+    {
+      "arg_map": {},
+      "degraded_kind": "irreversible",
+      "gates": [],
+      "inverse_tool": null,
+      "kind": "irreversible",
+      "notes": "Completing a payroll closes the rescind window on everything it covers, which makes it the single most consequential action on this surface: it does not just resist undo, it destroys other actions' undo paths.",
+      "one_shot": false,
+      "residue": "",
+      "snapshot_fields": [],
+      "static_args": {},
+      "steps": [],
+      "tool": "workday.payroll.complete",
+      "window_seconds": null
+    },
+    {
+      "arg_map": {},
+      "degraded_kind": "irreversible",
+      "gates": [],
+      "inverse_tool": null,
+      "kind": "irreversible",
+      "notes": "Funds disbursed. No inverse exists inside Workday.",
+      "one_shot": false,
+      "residue": "",
+      "snapshot_fields": [],
+      "static_args": {},
+      "steps": [],
+      "tool": "workday.payment.settle",
+      "window_seconds": null
+    }
+  ]
+}

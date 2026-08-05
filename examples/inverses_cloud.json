@@ -1,0 +1,324 @@
+{
+  "specs": [
+    {
+      "arg_map": {
+        "Bucket": "args.Bucket",
+        "Key": "args.Key",
+        "VersionId": "result.VersionId"
+      },
+      "degraded_kind": "irreversible",
+      "gates": [
+        {
+          "check_at": "authorize",
+          "description": "The target bucket must have versioning enabled. Without it, a delete or overwrite destroys the object outright and there is nothing to restore.",
+          "name": "aws_s3_versioning_enabled",
+          "remediation": "Enable versioning on buckets any agent can write to. This is the single highest-leverage change available on this surface: it converts every object delete and overwrite from irreversible to recoverable."
+        },
+        {
+          "check_at": "undo",
+          "description": "Removing a delete marker requires deleting a specific version, which MFA Delete blocks without an MFA code. An automated undo cannot supply one.",
+          "name": "aws_s3_mfa_delete_not_required",
+          "remediation": "Either accept that recovery on this bucket is a manual root-account operation, or run agents against buckets without MFA Delete."
+        }
+      ],
+      "inverse_tool": "aws.s3.delete_object_version",
+      "kind": "compensable",
+      "notes": "The canonical case for authorize-phase gates. With versioning on, the delete inserts a marker and `VersionId` in the response identifies it. With versioning off, this same call is unrecoverable \u2014 which is why the gate degrades the classification instead of hoping for the best.",
+      "one_shot": false,
+      "residue": "Undeleting works by deleting the delete marker, so the object's version history records both the deletion and its removal. Anything that read the key while the marker was current correctly saw a 404.",
+      "snapshot_fields": [],
+      "static_args": {},
+      "steps": [],
+      "tool": "aws.s3.delete_object",
+      "window_seconds": null
+    },
+    {
+      "arg_map": {
+        "Bucket": "args.Bucket",
+        "CopySource": "snapshot.PriorVersionSource",
+        "Key": "args.Key"
+      },
+      "degraded_kind": "irreversible",
+      "gates": [
+        {
+          "check_at": "authorize",
+          "description": "The target bucket must have versioning enabled. Without it, a delete or overwrite destroys the object outright and there is nothing to restore.",
+          "name": "aws_s3_versioning_enabled",
+          "remediation": "Enable versioning on buckets any agent can write to. This is the single highest-leverage change available on this surface: it converts every object delete and overwrite from irreversible to recoverable."
+        }
+      ],
+      "inverse_tool": "aws.s3.copy_object",
+      "kind": "compensable",
+      "notes": "`PriorVersionSource` should be captured as bucket/key?versionId=... so the copy is unambiguous. Without versioning an overwrite destroys the prior bytes and no snapshot short of copying the whole object helps.",
+      "one_shot": false,
+      "residue": "Restoring copies the prior version forward, creating a third version rather than removing the second. Consumers that read the key while the bad version was current got the bad content.",
+      "snapshot_fields": [
+        "PriorVersionSource",
+        "PriorVersionId",
+        "ETag"
+      ],
+      "static_args": {},
+      "steps": [],
+      "tool": "aws.s3.put_object",
+      "window_seconds": null
+    },
+    {
+      "arg_map": {
+        "PolicyArn": "args.PolicyArn",
+        "VersionId": "snapshot.DefaultVersionId"
+      },
+      "degraded_kind": "irreversible",
+      "gates": [
+        {
+          "check_at": "undo",
+          "description": "IAM keeps at most five versions of a customer managed policy. The version that was default before the change must still be among them.",
+          "name": "aws_iam_policy_version_retained",
+          "remediation": "If it was pruned, restore from the captured policy document by creating a new version rather than rolling back to an old one."
+        }
+      ],
+      "inverse_tool": "aws.iam.set_default_policy_version",
+      "kind": "reversible",
+      "notes": "IAM policy versioning is a genuine built-in undo: rolling back means making the previous version default again, with nothing deleted or recreated. The catch is the five-version ceiling \u2014 capture the prior default version id, and capture the document too so you can rebuild if the version was pruned.",
+      "one_shot": false,
+      "residue": "",
+      "snapshot_fields": [
+        "DefaultVersionId"
+      ],
+      "static_args": {},
+      "steps": [],
+      "tool": "aws.iam.create_policy_version",
+      "window_seconds": null
+    },
+    {
+      "arg_map": {
+        "PolicyArn": "args.PolicyArn",
+        "RoleName": "args.RoleName"
+      },
+      "degraded_kind": "irreversible",
+      "gates": [],
+      "inverse_tool": "aws.iam.detach_role_policy",
+      "kind": "reversible",
+      "notes": "Privilege grants are cleanly reversible, which is worth knowing: the dangerous direction on this surface is not granting access but removing it, or deleting the principal.",
+      "one_shot": false,
+      "residue": "",
+      "snapshot_fields": [],
+      "static_args": {},
+      "steps": [],
+      "tool": "aws.iam.attach_role_policy",
+      "window_seconds": null
+    },
+    {
+      "arg_map": {
+        "PolicyArn": "args.PolicyArn",
+        "RoleName": "args.RoleName"
+      },
+      "degraded_kind": "irreversible",
+      "gates": [],
+      "inverse_tool": "aws.iam.attach_role_policy",
+      "kind": "reversible",
+      "notes": "The lockout direction. Reversible, but the outage during it is not.",
+      "one_shot": false,
+      "residue": "",
+      "snapshot_fields": [],
+      "static_args": {},
+      "steps": [],
+      "tool": "aws.iam.detach_role_policy",
+      "window_seconds": null
+    },
+    {
+      "arg_map": {},
+      "degraded_kind": "irreversible",
+      "gates": [],
+      "inverse_tool": null,
+      "kind": "irreversible",
+      "notes": "No soft delete. Recreating a role with the same name produces a different principal id, so every trust policy and every resource policy that referenced the old id must be rewritten. Treat recreation as a migration, not an undo.",
+      "one_shot": false,
+      "residue": "",
+      "snapshot_fields": [],
+      "static_args": {},
+      "steps": [],
+      "tool": "aws.iam.delete_role",
+      "window_seconds": null
+    },
+    {
+      "arg_map": {
+        "GroupId": "args.GroupId",
+        "IpPermissions": "args.IpPermissions"
+      },
+      "degraded_kind": "irreversible",
+      "gates": [],
+      "inverse_tool": "aws.ec2.revoke_security_group_ingress",
+      "kind": "reversible",
+      "notes": "Opening a port is exactly reversible by closing it.",
+      "one_shot": false,
+      "residue": "",
+      "snapshot_fields": [],
+      "static_args": {},
+      "steps": [],
+      "tool": "aws.ec2.authorize_security_group_ingress",
+      "window_seconds": null
+    },
+    {
+      "arg_map": {
+        "GroupId": "args.GroupId",
+        "IpPermissions": "snapshot.RevokedPermissions"
+      },
+      "degraded_kind": "irreversible",
+      "gates": [],
+      "inverse_tool": "aws.ec2.authorize_security_group_ingress",
+      "kind": "reversible",
+      "notes": "The self-lockout case: an agent tidying security groups removes the rule its own operators connect through. Restoring the exact permission set requires having captured it, because the revoke response does not return what it removed.",
+      "one_shot": false,
+      "residue": "",
+      "snapshot_fields": [
+        "RevokedPermissions"
+      ],
+      "static_args": {},
+      "steps": [],
+      "tool": "aws.ec2.revoke_security_group_ingress",
+      "window_seconds": null
+    },
+    {
+      "arg_map": {},
+      "degraded_kind": "irreversible",
+      "gates": [],
+      "inverse_tool": null,
+      "kind": "irreversible",
+      "notes": "Instance-store data is gone; even where EBS volumes survive, the instance identity, its IPs, and anything in memory do not. Launching a replacement is not an undo.",
+      "one_shot": false,
+      "residue": "",
+      "snapshot_fields": [],
+      "static_args": {},
+      "steps": [],
+      "tool": "aws.ec2.terminate_instances",
+      "window_seconds": null
+    },
+    {
+      "arg_map": {
+        "DBInstanceIdentifier": "args.DBInstanceIdentifier",
+        "DBSnapshotIdentifier": "args.FinalDBSnapshotIdentifier"
+      },
+      "degraded_kind": "irreversible",
+      "gates": [
+        {
+          "check_at": "authorize",
+          "description": "A deleted DB instance is recoverable only from a snapshot. The delete call must have requested a final snapshot, or a recent automated one must exist.",
+          "name": "aws_rds_final_snapshot_taken",
+          "remediation": "Never allow an agent to call DeleteDBInstance with SkipFinalSnapshot. Deny that argument shape in policy rather than relying on the undo."
+        }
+      ],
+      "inverse_tool": "aws.rds.restore_db_instance_from_snapshot",
+      "kind": "compensable",
+      "notes": "Policy should deny SkipFinalSnapshot outright rather than depend on this spec. The undo exists, but 'we lost the last few minutes of writes and changed the endpoint' is a bad day even when it works.",
+      "one_shot": false,
+      "residue": "A restore rebuilds the instance from the snapshot: writes after the snapshot are lost, the endpoint address changes, parameter and option group associations may need reapplying, and the restore itself takes long enough to be an outage.",
+      "snapshot_fields": [],
+      "static_args": {},
+      "steps": [],
+      "tool": "aws.rds.delete_db_instance",
+      "window_seconds": null
+    },
+    {
+      "arg_map": {
+        "ChangeBatch": "snapshot.PriorRecordSets",
+        "HostedZoneId": "args.HostedZoneId"
+      },
+      "degraded_kind": "irreversible",
+      "gates": [],
+      "inverse_tool": "aws.route53.change_resource_record_sets",
+      "kind": "compensable",
+      "notes": "Worth pairing with a policy rule that caps TTL on agent-writable zones: a low TTL is what bounds the residue, and it has to be set before the mistake, not after.",
+      "one_shot": false,
+      "residue": "The authoritative record is restored immediately, but resolvers and clients worldwide keep serving the wrong answer until the previous TTL expires. You cannot un-cache a DNS answer, so the record is fixed before the outage is over.",
+      "snapshot_fields": [
+        "PriorRecordSets"
+      ],
+      "static_args": {},
+      "steps": [],
+      "tool": "aws.route53.change_resource_record_sets",
+      "window_seconds": null
+    },
+    {
+      "arg_map": {
+        "KeyId": "args.KeyId"
+      },
+      "degraded_kind": "irreversible",
+      "gates": [
+        {
+          "check_at": "undo",
+          "description": "A KMS key scheduled for deletion can be recovered only while it is in PendingDeletion, during the waiting period set when it was scheduled.",
+          "name": "aws_kms_key_still_pending_deletion",
+          "remediation": "Cancel the deletion before the waiting period elapses."
+        }
+      ],
+      "inverse_tool": "aws.kms.cancel_key_deletion",
+      "kind": "reversible",
+      "notes": "One of the better-designed destructive operations in AWS: the mandatory waiting period is a built-in undo window, and cancelling restores the key intact. The window length is set when deletion is scheduled, which is why this is a gate rather than a fixed window_seconds \u2014 read the actual PendingWindowInDays rather than assuming.",
+      "one_shot": false,
+      "residue": "",
+      "snapshot_fields": [],
+      "static_args": {},
+      "steps": [],
+      "tool": "aws.kms.schedule_key_deletion",
+      "window_seconds": null
+    },
+    {
+      "arg_map": {
+        "KeyId": "args.KeyId"
+      },
+      "degraded_kind": "irreversible",
+      "gates": [],
+      "inverse_tool": "aws.kms.enable_key",
+      "kind": "reversible",
+      "notes": "Reversible, and the right containment move for a suspected key compromise: disable is undoable, scheduled deletion eventually is not.",
+      "one_shot": false,
+      "residue": "",
+      "snapshot_fields": [],
+      "static_args": {},
+      "steps": [],
+      "tool": "aws.kms.disable_key",
+      "window_seconds": null
+    },
+    {
+      "arg_map": {},
+      "degraded_kind": "irreversible",
+      "gates": [],
+      "inverse_tool": null,
+      "kind": "reversible",
+      "notes": "Ordering matters for the same reason it does in the SAP payment case: an undo executed in the wrong order can leave a worse state than the one it was correcting.",
+      "one_shot": false,
+      "residue": "",
+      "snapshot_fields": [
+        "PriorPolicy",
+        "PublicAccessBlock"
+      ],
+      "static_args": {},
+      "steps": [
+        {
+          "arg_map": {
+            "Bucket": "args.Bucket",
+            "PublicAccessBlockConfiguration": "snapshot.PublicAccessBlock"
+          },
+          "critical": true,
+          "description": "Re-block public access FIRST. Restoring a restrictive policy while the access block is still off leaves a window in which the bucket is reachable, and the whole point of the undo is to close that window.",
+          "name": "restore_public_access_block",
+          "static_args": {},
+          "tool": "aws.s3.put_public_access_block"
+        },
+        {
+          "arg_map": {
+            "Bucket": "args.Bucket",
+            "Policy": "snapshot.PriorPolicy"
+          },
+          "critical": true,
+          "description": "Put the captured prior bucket policy back.",
+          "name": "restore_policy",
+          "static_args": {},
+          "tool": "aws.s3.put_bucket_policy"
+        }
+      ],
+      "tool": "aws.s3.put_bucket_policy",
+      "window_seconds": null
+    }
+  ]
+}

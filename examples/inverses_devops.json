@@ -1,0 +1,300 @@
+{
+  "specs": [
+    {
+      "arg_map": {
+        "owner": "args.owner",
+        "ref": "args.ref",
+        "repo": "args.repo",
+        "sha": "snapshot.tip_sha"
+      },
+      "degraded_kind": "irreversible",
+      "gates": [
+        {
+          "check_at": "undo",
+          "description": "The captured commit must still exist on the remote. After a branch delete or force push the old commits become unreachable, and unreachable objects are eventually garbage collected.",
+          "name": "git_objects_not_collected",
+          "remediation": "Recover promptly. If the objects are gone, the only remaining sources are a local clone that still has them or a backup \u2014 and reflogs are local-only, so they cannot be fetched from the remote."
+        }
+      ],
+      "inverse_tool": "github.ref.create",
+      "kind": "reversible",
+      "notes": "A branch is a pointer, so recreating it at the captured SHA is an exact inverse \u2014 better than what GitHub's own UI offers, which only restores branches that were attached to a pull request. The whole recovery hinges on having captured tip_sha before the delete.",
+      "one_shot": false,
+      "residue": "",
+      "snapshot_fields": [
+        "tip_sha"
+      ],
+      "static_args": {},
+      "steps": [],
+      "tool": "github.branch.delete",
+      "window_seconds": null
+    },
+    {
+      "arg_map": {
+        "force": "const:true",
+        "owner": "args.owner",
+        "ref": "args.ref",
+        "repo": "args.repo",
+        "sha": "snapshot.prior_sha"
+      },
+      "degraded_kind": "irreversible",
+      "gates": [
+        {
+          "check_at": "undo",
+          "description": "The captured commit must still exist on the remote. After a branch delete or force push the old commits become unreachable, and unreachable objects are eventually garbage collected.",
+          "name": "git_objects_not_collected",
+          "remediation": "Recover promptly. If the objects are gone, the only remaining sources are a local clone that still has them or a backup \u2014 and reflogs are local-only, so they cannot be fetched from the remote."
+        }
+      ],
+      "inverse_tool": "github.ref.force_update",
+      "kind": "reversible",
+      "notes": "Force-push recovery normally depends on someone's local reflog, which is not fetchable from the remote and expires. Capturing prior_sha server-side removes that dependency entirely.",
+      "one_shot": false,
+      "residue": "",
+      "snapshot_fields": [
+        "prior_sha"
+      ],
+      "static_args": {},
+      "steps": [],
+      "tool": "github.ref.force_update",
+      "window_seconds": null
+    },
+    {
+      "arg_map": {
+        "merge_commit_sha": "result.sha",
+        "owner": "args.owner",
+        "repo": "args.repo"
+      },
+      "degraded_kind": "irreversible",
+      "gates": [],
+      "inverse_tool": "github.pr.revert",
+      "kind": "compensable",
+      "notes": "The honest classification. Reverting is not un-merging, and on a protected branch it is not even the same operation as a force push back.",
+      "one_shot": false,
+      "residue": "A revert adds a new commit rather than removing the merge, so history shows both. The merge event stands, and anything it triggered \u2014 a deployment, a release, a downstream consumer that already pulled \u2014 is not reverted with it.",
+      "snapshot_fields": [],
+      "static_args": {},
+      "steps": [],
+      "tool": "github.pr.merge",
+      "window_seconds": null
+    },
+    {
+      "arg_map": {
+        "branch": "args.branch",
+        "owner": "args.owner",
+        "protection": "snapshot.protection",
+        "repo": "args.repo"
+      },
+      "degraded_kind": "irreversible",
+      "gates": [],
+      "inverse_tool": "github.repo.update_branch_protection",
+      "kind": "reversible",
+      "notes": "An agent weakening branch protection is a control being switched off. Exactly restorable, and every push that landed while it was off stays landed \u2014 so this belongs behind approval regardless of its reversibility.",
+      "one_shot": false,
+      "residue": "",
+      "snapshot_fields": [
+        "protection"
+      ],
+      "static_args": {},
+      "steps": [],
+      "tool": "github.repo.update_branch_protection",
+      "window_seconds": null
+    },
+    {
+      "arg_map": {},
+      "degraded_kind": "irreversible",
+      "gates": [],
+      "inverse_tool": null,
+      "kind": "irreversible",
+      "notes": "Deliberately conservative. Organization-owned repositories may be restorable within a retention window depending on plan and settings, but that was not verified for this spec, and classifying it optimistically would be the exact mistake this file exists to prevent. Verify against your own org before relaxing it.",
+      "one_shot": false,
+      "residue": "",
+      "snapshot_fields": [],
+      "static_args": {},
+      "steps": [],
+      "tool": "github.repo.delete",
+      "window_seconds": null
+    },
+    {
+      "arg_map": {
+        "manifest": "snapshot.manifest"
+      },
+      "degraded_kind": "irreversible",
+      "gates": [
+        {
+          "check_at": "authorize",
+          "description": "The full prior manifest must have been captured before the delete. Kubernetes offers no undo for a deleted object, so the snapshot is the only copy.",
+          "name": "k8s_manifest_captured",
+          "remediation": "If the manifest is in Git, recover from there. Otherwise the object must be rebuilt by hand."
+        },
+        {
+          "check_at": "undo",
+          "description": "Any PersistentVolumeClaim the workload used must not have been reclaimed. With a Delete reclaim policy the underlying volume is destroyed with the claim, so re-applying the manifest restores the workload but not its data.",
+          "name": "k8s_persistent_data_retained",
+          "remediation": "Restore data from backup separately. Use Retain reclaim policy on volumes agents can touch."
+        }
+      ],
+      "inverse_tool": "k8s.resource.apply",
+      "kind": "compensable",
+      "notes": "The flagship example of this architecture's value. kubectl delete has no undo; capturing the manifest first is what creates one. The authorize gate means an agent cannot delete something whose manifest we failed to capture without a human seeing it first.",
+      "one_shot": false,
+      "residue": "Re-applying restores the object's spec but not its identity: the new object has a fresh UID and resourceVersion, its pods are recreated, in-flight requests were dropped, and anything that watched the delete event acted on it. If a PersistentVolumeClaim was reclaimed, the data is gone even though the workload is back.",
+      "snapshot_fields": [
+        "manifest"
+      ],
+      "static_args": {},
+      "steps": [],
+      "tool": "k8s.resource.delete",
+      "window_seconds": null
+    },
+    {
+      "arg_map": {
+        "manifest": "snapshot.manifest"
+      },
+      "degraded_kind": "irreversible",
+      "gates": [],
+      "inverse_tool": "k8s.resource.apply",
+      "kind": "compensable",
+      "notes": "",
+      "one_shot": false,
+      "residue": "Re-applying the prior manifest converges the spec back, but the intervening rollout happened: pods were replaced, and any traffic served by the bad version was served by it.",
+      "snapshot_fields": [
+        "manifest"
+      ],
+      "static_args": {},
+      "steps": [],
+      "tool": "k8s.resource.apply",
+      "window_seconds": null
+    },
+    {
+      "arg_map": {
+        "name": "args.name",
+        "namespace": "args.namespace",
+        "to_revision": "snapshot.revision"
+      },
+      "degraded_kind": "irreversible",
+      "gates": [
+        {
+          "check_at": "undo",
+          "description": "The target revision's ReplicaSet must still exist. revisionHistoryLimit (default 10) prunes old ReplicaSets, and a pruned revision cannot be recovered \u2014 its configuration is stored nowhere else.",
+          "name": "k8s_revision_still_in_history",
+          "remediation": "Re-apply the captured manifest instead of rolling back to a revision. Raise revisionHistoryLimit on workloads agents can deploy to."
+        }
+      ],
+      "inverse_tool": "k8s.rollout.undo",
+      "kind": "compensable",
+      "notes": "The gate is the point. This looks like a built-in undo, but revisionHistoryLimit silently prunes the revision you need \u2014 so the capability evaporates under a burst of deploys with no error until you reach for it. Capturing the image alongside the revision number gives a fallback that does not depend on history retention.",
+      "one_shot": false,
+      "residue": "The rollback is itself a new rollout: pods restart again, and the revision history now contains both the bad deploy and its reversal.",
+      "snapshot_fields": [
+        "revision",
+        "image"
+      ],
+      "static_args": {},
+      "steps": [],
+      "tool": "k8s.deployment.set_image",
+      "window_seconds": null
+    },
+    {
+      "arg_map": {
+        "name": "args.name",
+        "namespace": "args.namespace",
+        "replicas": "snapshot.replicas"
+      },
+      "degraded_kind": "irreversible",
+      "gates": [],
+      "inverse_tool": "k8s.scale",
+      "kind": "reversible",
+      "notes": "Includes the scale-to-zero case, which is how an agent takes a service down. Exactly reversible; the downtime is not.",
+      "one_shot": false,
+      "residue": "",
+      "snapshot_fields": [
+        "replicas"
+      ],
+      "static_args": {},
+      "steps": [],
+      "tool": "k8s.scale",
+      "window_seconds": null
+    },
+    {
+      "arg_map": {},
+      "degraded_kind": "irreversible",
+      "gates": [],
+      "inverse_tool": null,
+      "kind": "irreversible",
+      "notes": "A namespace delete cascades to every object in it. Even with manifests captured, restoring is a rebuild of arbitrary depth with new identities throughout \u2014 not an undo. This is a deny-by-policy operation, not a recoverable one.",
+      "one_shot": false,
+      "residue": "",
+      "snapshot_fields": [],
+      "static_args": {},
+      "steps": [],
+      "tool": "k8s.namespace.delete",
+      "window_seconds": null
+    },
+    {
+      "arg_map": {
+        "environment": "args.environment",
+        "flag_key": "args.flag_key",
+        "project": "args.project",
+        "targeting": "snapshot.targeting"
+      },
+      "degraded_kind": "irreversible",
+      "gates": [],
+      "inverse_tool": "flags.set_targeting",
+      "kind": "compensable",
+      "notes": "Feature flags read as trivially reversible and are the fastest way for an agent to change production behaviour at scale. The config reverts in a second; the consequences do not.",
+      "one_shot": false,
+      "residue": "Flipping the flag back is immediate, but every user served the other variant in the meantime saw it, and anything they did under it \u2014 orders placed, emails triggered, records written \u2014 stands.",
+      "snapshot_fields": [
+        "targeting",
+        "enabled"
+      ],
+      "static_args": {},
+      "steps": [],
+      "tool": "flags.set_targeting",
+      "window_seconds": null
+    },
+    {
+      "arg_map": {},
+      "degraded_kind": "irreversible",
+      "gates": [],
+      "inverse_tool": null,
+      "kind": "compensable",
+      "notes": "",
+      "one_shot": false,
+      "residue": "The autoscaler returns with fresh metrics history, so its first scaling decisions are made without the trend data it had before.",
+      "snapshot_fields": [
+        "manifest",
+        "target_name",
+        "current_replicas"
+      ],
+      "static_args": {},
+      "steps": [
+        {
+          "arg_map": {
+            "name": "snapshot.target_name",
+            "namespace": "args.namespace",
+            "replicas": "snapshot.current_replicas"
+          },
+          "critical": true,
+          "description": "Put the replica count back FIRST. Recreating the autoscaler against a workload left at the wrong size makes it scale from a bad baseline, which is a second incident rather than a recovery.",
+          "name": "restore_replicas",
+          "static_args": {},
+          "tool": "k8s.scale"
+        },
+        {
+          "arg_map": {
+            "manifest": "snapshot.manifest"
+          },
+          "critical": true,
+          "description": "Re-apply the captured HorizontalPodAutoscaler.",
+          "name": "recreate_hpa",
+          "static_args": {},
+          "tool": "k8s.resource.apply"
+        }
+      ],
+      "tool": "k8s.hpa.delete",
+      "window_seconds": null
+    }
+  ]
+}

@@ -1,0 +1,324 @@
+{
+  "specs": [
+    {
+      "arg_map": {},
+      "degraded_kind": "irreversible",
+      "gates": [],
+      "inverse_tool": "fs.noop",
+      "kind": "reversible",
+      "notes": "A read changes nothing.",
+      "one_shot": false,
+      "residue": "",
+      "snapshot_fields": [],
+      "static_args": {},
+      "steps": [],
+      "tool": "fs.read_file",
+      "window_seconds": null
+    },
+    {
+      "arg_map": {
+        "content": "snapshot.content",
+        "mode": "snapshot.mode",
+        "path": "args.path"
+      },
+      "degraded_kind": "irreversible",
+      "gates": [
+        {
+          "check_at": "authorize",
+          "description": "The file's prior content must have been captured. Very large or binary files may exceed whatever cap the state reader enforces, in which case there is nothing to restore.",
+          "name": "fs_content_captured",
+          "remediation": "Raise the snapshot size cap for paths agents may write, or keep those paths under version control so a copy exists elsewhere."
+        }
+      ],
+      "inverse_tool": "fs.write_file",
+      "kind": "reversible",
+      "notes": "Capture `existed` too: if the file did not exist before, the correct undo is deletion, not writing empty content. Getting that wrong leaves a zero-byte file that some build systems treat very differently from an absent one.",
+      "one_shot": false,
+      "residue": "",
+      "snapshot_fields": [
+        "content",
+        "mode",
+        "existed"
+      ],
+      "static_args": {},
+      "steps": [],
+      "tool": "fs.write_file",
+      "window_seconds": null
+    },
+    {
+      "arg_map": {
+        "content": "snapshot.content",
+        "mode": "snapshot.mode",
+        "path": "args.path"
+      },
+      "degraded_kind": "irreversible",
+      "gates": [
+        {
+          "check_at": "authorize",
+          "description": "The file's prior content must have been captured. Very large or binary files may exceed whatever cap the state reader enforces, in which case there is nothing to restore.",
+          "name": "fs_content_captured",
+          "remediation": "Raise the snapshot size cap for paths agents may write, or keep those paths under version control so a copy exists elsewhere."
+        }
+      ],
+      "inverse_tool": "fs.write_file",
+      "kind": "compensable",
+      "notes": "Compensable rather than reversible for the inode reason. It matters more than it sounds on systems where hard links carry meaning.",
+      "one_shot": false,
+      "residue": "The content comes back but the file does not: it has a new inode, so any hard links to the original are now separate files, and mtime, ctime, and ownership are reset unless explicitly restored. Anything watching the path saw a delete event.",
+      "snapshot_fields": [
+        "content",
+        "mode",
+        "mtime",
+        "owner"
+      ],
+      "static_args": {},
+      "steps": [],
+      "tool": "fs.delete_file",
+      "window_seconds": null
+    },
+    {
+      "arg_map": {
+        "dest": "args.src",
+        "src": "args.dest"
+      },
+      "degraded_kind": "irreversible",
+      "gates": [],
+      "inverse_tool": "fs.move",
+      "kind": "reversible",
+      "notes": "The cleanest inverse on this surface: swap the arguments. Note it is only exact if the destination did not already exist and get overwritten \u2014 capture that if the tool permits overwriting.",
+      "one_shot": false,
+      "residue": "",
+      "snapshot_fields": [],
+      "static_args": {},
+      "steps": [],
+      "tool": "fs.move",
+      "window_seconds": null
+    },
+    {
+      "arg_map": {
+        "mode": "snapshot.mode",
+        "path": "args.path"
+      },
+      "degraded_kind": "irreversible",
+      "gates": [],
+      "inverse_tool": "fs.chmod",
+      "kind": "reversible",
+      "notes": "",
+      "one_shot": false,
+      "residue": "",
+      "snapshot_fields": [
+        "mode"
+      ],
+      "static_args": {},
+      "steps": [],
+      "tool": "fs.chmod",
+      "window_seconds": null
+    },
+    {
+      "arg_map": {
+        "path": "args.path",
+        "tree": "snapshot.tree"
+      },
+      "degraded_kind": "irreversible",
+      "gates": [
+        {
+          "check_at": "authorize",
+          "description": "A recursive delete is recoverable only if the entire subtree was captured first \u2014 every file's content, plus modes and layout.",
+          "name": "fs_tree_captured",
+          "remediation": "Do not let agents delete trees. This is the operation behind the wiped-home-directory incidents; deny it and require a human, rather than relying on a snapshot large enough to cover it."
+        }
+      ],
+      "inverse_tool": "fs.restore_tree",
+      "kind": "compensable",
+      "notes": "This is the wiped-home-directory operation. The authorize gate defaults it to irreversible, which under the starter policy means a human sees every recursive delete before it happens. That is the intended behaviour, not an inconvenience to be configured away.",
+      "one_shot": false,
+      "residue": "Even with a full capture, restoration rebuilds files with new inodes and reset timestamps, loses hard links and any special files, and cannot restore anything excluded by the snapshot's own limits.",
+      "snapshot_fields": [
+        "tree"
+      ],
+      "static_args": {},
+      "steps": [],
+      "tool": "fs.delete_tree",
+      "window_seconds": null
+    },
+    {
+      "arg_map": {
+        "mode": "const:soft",
+        "ref": "snapshot.head_sha"
+      },
+      "degraded_kind": "irreversible",
+      "gates": [],
+      "inverse_tool": "git.reset",
+      "kind": "reversible",
+      "notes": "A soft reset, deliberately: it moves the branch pointer back while leaving the changes staged, so the work is preserved and only the commit is undone. A hard reset here would destroy exactly what the agent was asked to produce.",
+      "one_shot": false,
+      "residue": "",
+      "snapshot_fields": [
+        "head_sha"
+      ],
+      "static_args": {},
+      "steps": [],
+      "tool": "git.commit",
+      "window_seconds": null
+    },
+    {
+      "arg_map": {
+        "ref": "snapshot.head_ref"
+      },
+      "degraded_kind": "irreversible",
+      "gates": [],
+      "inverse_tool": "git.checkout",
+      "kind": "reversible",
+      "notes": "",
+      "one_shot": false,
+      "residue": "",
+      "snapshot_fields": [
+        "head_ref",
+        "head_sha"
+      ],
+      "static_args": {},
+      "steps": [],
+      "tool": "git.checkout",
+      "window_seconds": null
+    },
+    {
+      "arg_map": {
+        "name": "args.name",
+        "sha": "snapshot.tip_sha"
+      },
+      "degraded_kind": "irreversible",
+      "gates": [
+        {
+          "check_at": "undo",
+          "description": "The captured commit must still exist locally. It becomes unreachable after the reset and is eventually garbage collected.",
+          "name": "git_commit_still_reachable",
+          "remediation": "Recover promptly, or restore the branch from a remote that still has it."
+        }
+      ],
+      "inverse_tool": "git.branch.create",
+      "kind": "reversible",
+      "notes": "A branch is a pointer; recreating it at the captured SHA is exact.",
+      "one_shot": false,
+      "residue": "",
+      "snapshot_fields": [
+        "tip_sha"
+      ],
+      "static_args": {},
+      "steps": [],
+      "tool": "git.branch.delete",
+      "window_seconds": null
+    },
+    {
+      "arg_map": {
+        "mode": "const:hard",
+        "ref": "snapshot.head_sha"
+      },
+      "degraded_kind": "irreversible",
+      "gates": [
+        {
+          "check_at": "undo",
+          "description": "The captured commit must still exist locally. It becomes unreachable after the reset and is eventually garbage collected.",
+          "name": "git_commit_still_reachable",
+          "remediation": "Recover promptly, or restore the branch from a remote that still has it."
+        }
+      ],
+      "inverse_tool": "git.reset",
+      "kind": "compensable",
+      "notes": "Capture `dirty` (whether the working tree had uncommitted changes) so the residue can be stated precisely rather than generically. On a clean tree this is effectively reversible; on a dirty one it destroyed work, and the evidence pack should say which.",
+      "one_shot": false,
+      "residue": "The commit history is restored exactly, but any uncommitted modifications to tracked files that the reset overwrote are gone permanently. They were never hashed into a git object, so no reflog entry, no unreachable commit, and no gc setting can bring them back.",
+      "snapshot_fields": [
+        "head_sha",
+        "dirty"
+      ],
+      "static_args": {},
+      "steps": [],
+      "tool": "git.reset_hard",
+      "window_seconds": null
+    },
+    {
+      "arg_map": {},
+      "degraded_kind": "irreversible",
+      "gates": [],
+      "inverse_tool": null,
+      "kind": "irreversible",
+      "notes": "Removes untracked files, which git has never had a copy of. Nothing in the repository can restore them. Unambiguous, and worth registering explicitly so it escalates rather than falling into UNKNOWN by accident.",
+      "one_shot": false,
+      "residue": "",
+      "snapshot_fields": [],
+      "static_args": {},
+      "steps": [],
+      "tool": "git.clean",
+      "window_seconds": null
+    },
+    {
+      "arg_map": {},
+      "degraded_kind": "irreversible",
+      "gates": [],
+      "inverse_tool": null,
+      "kind": "irreversible",
+      "notes": "Conservative on purpose. A dropped stash commit may linger unreachable and be recoverable by hand, but that is a forensic exercise with no API, not an undo this control plane should promise.",
+      "one_shot": false,
+      "residue": "",
+      "snapshot_fields": [],
+      "static_args": {},
+      "steps": [],
+      "tool": "git.stash_drop",
+      "window_seconds": null
+    },
+    {
+      "arg_map": {},
+      "degraded_kind": "unknown",
+      "gates": [],
+      "inverse_tool": null,
+      "kind": "unknown",
+      "notes": "Left UNKNOWN deliberately, and this is the most important entry in the file. An arbitrary command's effects cannot be known in advance, so no honest inverse can be declared. Under the starter policy UNKNOWN escalates to a human on every invocation \u2014 which is the correct answer, and the argument for giving agents specific tools rather than a shell. If shell access is unavoidable, the enforcement layer's threat scanner and argument conditions are the control, not the reversal layer.",
+      "one_shot": false,
+      "residue": "",
+      "snapshot_fields": [],
+      "static_args": {},
+      "steps": [],
+      "tool": "shell.exec",
+      "window_seconds": null
+    },
+    {
+      "arg_map": {},
+      "degraded_kind": "irreversible",
+      "gates": [],
+      "inverse_tool": null,
+      "kind": "compensable",
+      "notes": "",
+      "one_shot": false,
+      "residue": "Popping a stash can conflict if the branch moved in the meantime, leaving the working tree in a conflicted state that needs a human to resolve.",
+      "snapshot_fields": [
+        "head_ref",
+        "head_sha"
+      ],
+      "static_args": {},
+      "steps": [
+        {
+          "arg_map": {
+            "ref": "snapshot.head_ref"
+          },
+          "critical": true,
+          "description": "Go back to the original branch FIRST. Popping the stash onto the wrong branch applies the changes somewhere they were never meant to be, which is harder to clean up than the original mistake.",
+          "name": "return_to_branch",
+          "static_args": {},
+          "tool": "git.checkout"
+        },
+        {
+          "arg_map": {
+            "ref": "result.stash_ref"
+          },
+          "critical": true,
+          "description": "Reapply the work that was stashed to allow the switch.",
+          "name": "restore_stash",
+          "static_args": {},
+          "tool": "git.stash_pop"
+        }
+      ],
+      "tool": "git.switch_with_stash",
+      "window_seconds": null
+    }
+  ]
+}

@@ -1,0 +1,70 @@
+# A reversibility-first policy for an accounts-payable agent surface.
+#
+# Rules are evaluated top to bottom; the first match wins, like a firewall.
+# Validate before shipping:   praetor policy-check examples/policy.yaml
+
+name: ap-reversibility-first
+version: "1"
+
+# Deny anything no rule permits. The CLI warns if you set this to allow.
+default_effect: deny
+
+rules:
+  # Reads change nothing and carry no rollback obligation.
+  - id: reads-always-fine
+    effect: allow
+    actions: [read]
+    reason: "Reads change nothing."
+
+  # Heuristic injection signals hold for a human rather than hard-denying, so a
+  # false positive costs a review click instead of a broken workflow.
+  - id: hold-injection-suspects
+    effect: require_approval
+    min_threat_score: 4
+    reason: "Arguments carry markers of injected instructions; a human decides."
+
+  # The rule this whole package exists for. Unclassified tools are grouped with
+  # irreversible ones: the safe reading of "we haven't mapped an undo yet" is
+  # "assume there is none."
+  - id: no-undo-needs-a-human
+    effect: require_approval
+    reversibility: [irreversible, unknown]
+    reason: "No rollback path exists, so a person must own this decision."
+
+  # Vendor-master edits are the standard payment-fraud vector. They are
+  # reversible here, but they still get a second pair of eyes.
+  - id: vendor-master-changes-are-reviewed
+    effect: require_approval
+    tools: ["vendors.*"]
+    reason: "Vendor banking changes are the standard payment-fraud vector."
+
+  # Mask the account number before it reaches a tool that does not need it.
+  - id: mask-bank-details-to-reporting
+    effect: redact
+    tools: ["reporting.*"]
+    redact_fields: [bank_account, tax_id]
+    reason: "Reporting tools get the shape of the record, not the secrets."
+
+  # Undoable payments, bounded by cumulative session spend. Once the running
+  # total would cross the limit this rule stops matching and the call falls
+  # through to the default deny.
+  - id: bounded-reversible-payments
+    effect: allow
+    tools: [invoices.pay, invoices.approve]
+    reversibility: [reversible, compensable]
+    budget:
+      key: payments_total
+      field: amount
+      limit: 25000
+    reason: "Undoable payment within the session ceiling."
+
+  # Large single payments always involve a person, even when undoable.
+  - id: large-payments-need-an-approver
+    effect: require_approval
+    tools: [invoices.pay]
+    require_roles: [ap-clerk]
+    when:
+      field: amount
+      op: ge
+      value: 10000
+    reason: "Single payments at or above 10,000 are approved by a human."
