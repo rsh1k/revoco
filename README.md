@@ -218,17 +218,36 @@ This follows the protocol from [MCPShield](https://arxiv.org/abs/2605.11053), wh
 
 **Deliberately not a trainer.** Their best configuration is Sentence-BERT under a tree ensemble at 0.975 AUROC, and their sharpest finding is that feature quality beats architecture. Both true, neither adopted: this scanner stays a transparent set of weighted regexes because its hits have to be explainable to whoever approves the call. A 768-dimensional embedding can't tell an approver *why* it objected.
 
+### Attack content comes from ATBench
+
+The bundled corpus has three content-attack samples — far too few to calibrate anything, since a perfect AUROC on three samples just means the corpus can't disagree with you. [ATBench](https://huggingface.co/datasets/AI45Research/ATBench) (Apache-2.0) supplies 500 human-audited trajectories, and its risk taxonomy splits exactly along the line that matters here: injection sources carry text payloads a scanner can see, while corrupted feedback and misinformation carry none.
+
+```bash
+ATBENCH_PATH=/path/to/ATBench500/test.json revoco calibrate
+```
+
+Nothing vendored, same as RAS-Eval. Apache-2.0 would permit it; five megabytes of evaluation data still doesn't belong inside a control plane.
+
+**Labelled by risk source, not by ATBench's own label.** Their label records whether the *agent behaved badly*, so a trajectory carrying an injection payload the agent correctly resisted is labelled safe — 84 of 127 indirect-injection trajectories are in that bucket, payload and all. Using their label would have put 84 payload-carrying samples in the negative class and made a correctly-firing scanner look catastrophically noisy. **A borrowed dataset's label is only usable when it answers your question.**
+
 ### What it found
 
-Three findings, and two of them are about the measurement rather than the scanner:
+**The honest headline: task-disjoint AUROC 0.752, with 48% recall at 100% precision.** The scanner catches about half of real injection payloads and spends no human attention on legitimate work. Not 0.97 — and that's the point of measuring rather than asserting.
 
-**Every real attack payload is caught, at threshold 4 with zero false positives.** That's the operating point the report names — and it's the strictest one that spends no human attention on legitimate work, which matters because an approver who learns the alerts are usually wrong stops reading them.
+Quote the *task-disjoint* number, not the pooled one. Before the fixes below, random splits inflated it by **+8.4 points** — MCPShield's finding reproduced on this corpus.
 
-**12 of 18 patterns never fire on this corpus.** Unmeasured rather than useless, but a pattern carrying a weight nobody has justified is a liability.
+**Two genuine regex bugs, both invisible to a probe that only ever fed the pattern true positives:**
 
-**`dot-dot-slash` fires more on benign traffic than on attacks** — it hits `B25`, a scenario written precisely to carry legitimate `../` paths in build config. Not a corpus bug; that scenario exists to catch exactly this. On this corpus the pattern is a weighted vote for the wrong answer.
+- `instruction-to-exfiltrate` was written `reveal|exfiltrate|leak|send.*(api_key|password|…)`. Alternation binds loosely, so bare "reveal" matched with no credential anywhere. It fired on **37 benign samples against 19 attacks** — a weight-3 vote for the wrong answer.
+- `high-risk-tld` treated `.zip` and `.mov` as hostile. They're real gTLDs and, far more often, file extensions.
 
-**And the honest headline: three attack samples is far too few to calibrate anything.** The AUROC of 1.000 means the corpus cannot disagree with you. The report says so in as many words rather than quoting the number, and `compare_splits` returns *"not measurable"* instead of a figure when a held-out fold contains no attacks. The fix is more content-attack tasks — RAS-Eval ships 3,802 of them — not a threshold change.
+Fixing both raised task-disjoint AUROC from 0.667 to 0.752 while *lowering* the pooled figure — the signature of removing spurious signal.
+
+**Two patterns demoted to weight 0 by measurement.** Both still fire on benign traffic after tightening, so the vote is wrong even if the observation isn't. Weight 0 keeps the hit visible to an analyst and stops it moving a score that gates approval.
+
+**One pattern carries most of the recall.** `ignore-previous-instructions` accounts for 103 of 221 true positives, which is why recall collapses above threshold 4. This is not an ensemble, and it's worth knowing that before trusting it.
+
+**8 patterns still never fire.** Unmeasured rather than disproven — but a pattern carrying an unjustified weight is a liability.
 
 ---
 

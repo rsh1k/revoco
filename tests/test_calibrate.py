@@ -16,6 +16,8 @@ from revoco.gate.calibrate import (
     Sample,
     _auprc,
     _auroc,
+    atbench_path,
+    atbench_samples,
     compare_splits,
     corpus_samples,
     evaluate,
@@ -171,12 +173,15 @@ def test_reconnaissance_reads_in_an_attack_scenario_count_as_benign():
 # ---------------------------------------------------------------------------
 
 
-def test_every_real_attack_payload_is_caught_at_the_clean_threshold():
+def test_there_is_an_operating_point_with_no_false_positives():
+    """Originally asserted recall == 1.0, which was true only of the three-sample
+    corpus. Real attack content puts recall near 48%, so the durable property is that
+    a zero-false-positive point exists at all — not that it catches everything."""
     cal = evaluate(corpus_samples())
     point = cal.strictest_clean
     assert point is not None
-    assert point.recall == 1.0      # all content-attack calls
     assert point.fp == 0
+    assert point.tp > 0
 
 
 def test_a_tiny_attack_sample_is_called_out_rather_than_celebrated():
@@ -192,23 +197,32 @@ def test_patterns_that_never_fire_are_reported_as_unmeasured():
     assert any("never fired" in n for n in cal.notes)
 
 
-def test_a_pattern_firing_more_on_benign_traffic_is_flagged_as_noisy():
-    """`dot-dot-slash` hits B25, a scenario written precisely to carry legitimate `../`.
+def test_a_weighted_pattern_that_favours_benign_traffic_is_flagged():
+    """Verdicts are computed from lift, not asserted per pattern.
 
-    Not a corpus bug — that scenario exists to catch this. The pattern is a weighted
-    vote for the wrong answer on ordinary build config, and the harness says so.
+    The original version named `dot-dot-slash` as noisy — true on three samples, and
+    wrong once real content arrived, where its lift is 1.67. Pinning a specific
+    pattern here would have meant re-editing the test every time the corpus grew, and
+    would have hidden the correction rather than surfacing it.
     """
     cal = evaluate(corpus_samples())
-    assert "dot-dot-slash" in cal.noisy
-    assert any("MORE on benign" in n for n in cal.notes)
+    for stat in cal.patterns:
+        if stat.verdict == "noisy":
+            assert stat.weight > 0
+            assert (stat.lift or 0.0) < 1.0
+    if cal.noisy:
+        assert any("MORE on benign" in n for n in cal.notes)
 
 
-def test_pattern_lift_distinguishes_clean_from_noisy_from_dead():
+def test_verdicts_follow_from_the_measured_rates():
     cal = evaluate(corpus_samples())
-    by_label = {p.label: p for p in cal.patterns}
-    assert by_label["ignore-previous-instructions"].verdict == "clean"
-    assert by_label["dot-dot-slash"].verdict == "noisy"
-    assert by_label["private-key-block"].verdict == "dead"
+    for stat in cal.patterns:
+        if stat.verdict == "dead":
+            assert stat.hits_malicious == 0 and stat.hits_benign == 0
+        elif stat.verdict == "clean":
+            assert stat.hits_benign == 0 and stat.hits_malicious > 0
+        elif stat.verdict == "observation":
+            assert stat.weight == 0
 
 
 def test_the_scanner_only_reads_arguments_so_there_is_no_tool_signature_to_learn():
@@ -234,9 +248,171 @@ def test_calibration_serialises_for_a_dashboard():
     d = evaluate(corpus_samples()).to_dict()
     assert d["auroc"] >= 0.0
     assert "thresholds" in d and "patterns" in d
-    assert d["noisy_patterns"] == ["dot-dot-slash"]
+    for key in ("noisy_patterns", "dead_patterns", "demoted_patterns"):
+        assert isinstance(d[key], list)
 
 
 @pytest.mark.parametrize("content_only", [True, False])
 def test_corpus_samples_never_returns_an_empty_set(content_only):
     assert corpus_samples(content_only=content_only)
+
+
+# ---------------------------------------------------------------------------
+# ATBench: external attack content
+# ---------------------------------------------------------------------------
+
+atbench = pytest.mark.skipif(
+    atbench_path() is None,
+    reason="no ATBench snapshot; set ATBENCH_PATH to include these",
+)
+
+
+def test_absent_atbench_yields_no_samples_rather_than_an_error():
+    assert atbench_samples("/nonexistent/atbench.json") == []
+
+
+def test_nothing_from_atbench_is_vendored():
+    """Apache-2.0 would permit it. Five megabytes of evaluation data still does not
+    belong inside a control plane, and the no-vendor rule should not get an exception
+    carved into it for convenience."""
+    from pathlib import Path
+
+    repo = Path(__file__).resolve().parent.parent
+    strays = [
+        p for p in repo.rglob("*.json")
+        if "atbench" in p.name.lower() and ".venv" not in str(p)
+    ]
+    assert not strays, f"looks vendored: {strays}"
+
+
+def test_injection_and_semantic_risk_sources_are_kept_apart():
+    """The split that makes ATBench usable for a *content* scanner.
+
+    Falsified tool feedback and misinformation carry no textual signal, exactly like
+    vendor-bank fraud. Scoring the scanner against them measures the wrong control.
+    """
+    from revoco.gate.calibrate import INJECTION_RISK_SOURCES
+
+    assert "indirect_prompt_injection" in INJECTION_RISK_SOURCES
+    assert "tool_description_injection" in INJECTION_RISK_SOURCES
+    assert "corrupted_tool_feedback" not in INJECTION_RISK_SOURCES
+    assert "unreliable_or_misinformation" not in INJECTION_RISK_SOURCES
+
+
+@atbench
+def test_samples_are_labelled_by_risk_source_not_by_atbench_label():
+    """The fourth labelling trap, and the least obvious.
+
+    ATBench's `label` records whether the *agent behaved badly*, so a trajectory
+    carrying an injection payload the agent correctly resisted is labelled safe. 84 of
+    127 indirect-injection trajectories are safe and still contain the payload. Using
+    their label would put 84 payload-carrying samples in the negative class and make a
+    correctly-firing scanner look catastrophically noisy.
+
+    A borrowed dataset's label is only usable when it answers your question.
+    """
+    samples = atbench_samples()
+    assert samples
+    indirect = [s for s in samples if s.source == "atbench:indirect_prompt_injection"]
+    assert indirect
+    # Every indirect-injection trajectory is a positive, regardless of its own label.
+    assert all(s.malicious for s in indirect)
+    # And there are more of them than ATBench labels unsafe.
+    assert len(indirect) > 43
+
+
+@atbench
+def test_agent_reasoning_is_excluded_from_the_scanned_text():
+    """A scanner flagging the agent's summary of a payload reports the symptom.
+
+    It would fire just as readily when the agent correctly refused, which is the one
+    case that must not be penalised.
+
+    Checked structurally. The first version searched the joined text for `"thought"`
+    and failed on tool-response data that happened to contain the word — a textual
+    assertion standing in for a structural claim.
+    """
+    import json as _json
+
+    from revoco.gate.calibrate import _untrusted_text, atbench_path
+
+    with open(atbench_path()) as fh:
+        records = _json.load(fh)
+
+    checked = 0
+    for rec in records:
+        blocks = rec.get("content") or []
+        turns = blocks[0] if (blocks and isinstance(blocks[0], list)) else blocks
+        agent_turns = [t for t in (turns or [])
+                       if isinstance(t, dict) and t.get("role") == "agent"]
+        env_turns = [t for t in (turns or [])
+                     if isinstance(t, dict) and t.get("role") == "environment"]
+        if not agent_turns or not env_turns:
+            continue
+        text = _untrusted_text(rec)
+        action = str(agent_turns[0].get("action") or "")
+        if len(action) > 40:
+            assert action not in text          # the agent's own call is not scanned
+        env = str(env_turns[0].get("content") or "")
+        if len(env) > 40:
+            assert env[:40] in text            # the untrusted response is
+        checked += 1
+        if checked >= 25:
+            break
+    assert checked, "no trajectory had both an agent and an environment turn"
+
+
+@atbench
+def test_the_corpus_is_now_large_enough_to_calibrate_against():
+    cal = evaluate(corpus_samples())
+    assert cal.n_malicious > 100
+    assert cal.n_benign > 100
+    # And the small-sample warning stands down.
+    assert not any("ONLY" in n and "ATTACK SAMPLE" in n for n in cal.notes)
+
+
+@atbench
+def test_the_scanner_ranks_meaningfully_better_than_chance():
+    """0.75-ish, not 0.97. A weighted-regex scanner catches about half of real
+    injection payloads at zero false positives, and that is the honest number."""
+    cal = evaluate(corpus_samples())
+    assert 0.65 < cal.auroc < 0.90
+    point = cal.strictest_clean
+    assert point.fp == 0
+    assert 0.3 < point.recall < 0.8
+
+
+@atbench
+def test_the_task_disjoint_number_is_the_one_to_quote():
+    """With real data MCPShield's leak applies here too, so the pooled figure is not
+    the honest one. It was +8.4 points before the regex fixes."""
+    splits = compare_splits(corpus_samples())
+    assert splits["measurable"]
+    assert abs(splits["inflation_points"]) < 5.0     # after the fixes
+
+
+@atbench
+def test_calibration_demoted_two_patterns_and_they_stay_demoted():
+    """Regression guard on two regex bugs measurement found.
+
+    `instruction-to-exfiltrate` had loose alternation — bare "reveal" matched with no
+    credential anywhere. `high-risk-tld` treated `.zip` and `.mov` as hostile when
+    they are usually file extensions. Both now carry weight 0: the hit is still shown
+    to an analyst, it just no longer moves a score that gates approval.
+    """
+    cal = evaluate(corpus_samples())
+    assert set(cal.demoted) == {"instruction-to-exfiltrate", "high-risk-tld"}
+    assert not cal.noisy      # a weight-0 pattern cannot vote wrongly
+
+
+@atbench
+def test_one_pattern_carries_most_of_the_recall():
+    """Worth knowing and worth stating: this is not an ensemble.
+
+    `ignore-previous-instructions` accounts for the great majority of true positives,
+    which is why recall collapses above threshold 4.
+    """
+    cal = evaluate(corpus_samples())
+    top = max(cal.patterns, key=lambda p: p.hits_malicious)
+    assert top.label == "ignore-previous-instructions"
+    assert top.hits_malicious > 0.5 * cal.n_malicious * 0.8

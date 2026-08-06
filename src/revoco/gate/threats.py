@@ -48,8 +48,24 @@ _PATTERNS: list[tuple[re.Pattern[str], ThreatCategory, str, int]] = [
      ThreatCategory.PROMPT_INJECTION, "disregard-system", 3),
     (re.compile(r"\byou\s+are\s+now\b|\bnew\s+role\b|\bact\s+as\b", re.I),
      ThreatCategory.PROMPT_INJECTION, "role-reassignment", 2),
-    (re.compile(r"reveal|exfiltrate|leak|send.*(api[_\s-]?key|password|secret|token)", re.I),
-     ThreatCategory.PROMPT_INJECTION, "instruction-to-exfiltrate", 3),
+    # The verb must actually govern a credential. The first version wrote this as
+    # `reveal|exfiltrate|leak|send.*(api_key|password|secret|token)`, where alternation
+    # binds loosely: bare "reveal" matched, with no credential anywhere. Calibration
+    # measured it firing on 37 benign samples against 19 attacks — a weight-3 vote for
+    # the wrong answer, and invisible to a probe that only ever fed it true positives.
+    (re.compile(
+        r"\b(reveal|exfiltrate|leak|expose|send|post|upload)\b[^.\n]{0,60}?"
+        r"\b(api[_\s-]?keys?|password|secret|token|credential)s?\b",
+        re.I,
+    ),
+     # Weight 0, set by measurement rather than judgement. Even after the regex was
+     # tightened this fires on 4 benign samples against 1 attack — as a weighted vote
+     # it is worse than nothing. Weight 0 keeps the hit visible in `ScanResult.hits`
+     # and in the audit obligations, so an analyst still sees that the text talked
+     # about sending a secret, while it stops moving a score that gates approval.
+     # Evidence is corpus-specific: an exfiltration instruction is a real signal, it
+     # just is not a discriminating one in the data available here.
+     ThreatCategory.PROMPT_INJECTION, "instruction-to-exfiltrate", 0),
     (re.compile(r"</?(system|assistant|tool)[>\]]", re.I),
      ThreatCategory.PROMPT_INJECTION, "fake-role-delimiter", 3),
 
@@ -78,8 +94,16 @@ _PATTERNS: list[tuple[re.Pattern[str], ThreatCategory, str, int]] = [
     # --- suspicious egress URLs -------------------------------------------
     (re.compile(r"https?://\d{1,3}(\.\d{1,3}){3}"),
      ThreatCategory.SUSPICIOUS_URL, "raw-ip-url", 2),
-    (re.compile(r"https?://[^\s\"']*\.(?:tk|top|xyz|click|zip|mov)\b", re.I),
-     ThreatCategory.SUSPICIOUS_URL, "high-risk-tld", 2),
+    # `.zip` and `.mov` are real gTLDs and, far more often, file extensions — a link
+    # ending in `.zip` is usually a download. Calibration caught this firing on 4
+    # benign samples against 1 attack. They are matched only as a bare authority, with
+    # nothing following, which is the shape that actually indicates a hostile host.
+    (re.compile(r"https?://[^\s\"'/]*\.(?:tk|top|xyz|click)\b", re.I),
+     # Also demoted to 0 by calibration: 0 attacks, 3 benign. Same reasoning — the
+     # observation survives, the vote does not.
+     ThreatCategory.SUSPICIOUS_URL, "high-risk-tld", 0),
+    (re.compile(r"https?://[^\s\"'/]*\.(?:zip|mov)(?:[/?#]|$)", re.I),
+     ThreatCategory.SUSPICIOUS_URL, "filename-lookalike-tld", 2),
 
     # --- obfuscation -------------------------------------------------------
     # Zero-width and Unicode-tag characters carry payloads invisible in any

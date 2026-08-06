@@ -46,8 +46,10 @@ from __future__ import annotations
 
 import json
 import math
+import os
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 from .threats import _PATTERNS, ScanResult, ThreatScanner
@@ -147,11 +149,17 @@ class PatternStat:
     def verdict(self) -> str:
         if not self.hits_malicious and not self.hits_benign:
             return "dead"        # never fires on this corpus: unmeasured, not proven
+        if self.weight == 0:
+            # Already demoted. It still fires, and the hit is still surfaced to an
+            # analyst, but it contributes nothing to the score — so it cannot be a
+            # vote for the wrong answer, and reporting it as one would be crying wolf
+            # about something the last round already fixed.
+            return "observation"
         if not self.hits_benign:
             return "clean"       # only fires on attacks
         lift = self.lift or 0.0
         if lift < 1.0:
-            return "noisy"       # fires more on benign: actively harmful
+            return "noisy"       # fires more on benign: actively harmful as a vote
         if lift < 2.0:
             return "weak"
         return "useful"
@@ -205,7 +213,16 @@ class Calibration:
 
     @property
     def noisy(self) -> list[str]:
+        """Patterns whose weight moves the score in the wrong direction.
+
+        Excludes weight-0 patterns by construction — see :attr:`PatternStat.verdict`.
+        """
         return [p.label for p in self.patterns if p.verdict == "noisy"]
+
+    @property
+    def demoted(self) -> list[str]:
+        """Patterns kept as observations after calibration removed their weight."""
+        return [p.label for p in self.patterns if p.verdict == "observation"]
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -220,6 +237,7 @@ class Calibration:
             "patterns": [p.to_dict() for p in self.patterns],
             "dead_patterns": self.dead,
             "noisy_patterns": self.noisy,
+            "demoted_patterns": self.demoted,
             "notes": list(self.notes),
         }
 
@@ -352,6 +370,12 @@ def evaluate(
         cal.notes.append(
             f"{len(cal.noisy)} pattern(s) fire MORE on benign traffic than on attacks: "
             f"{', '.join(cal.noisy)}. Those are weighted votes for the wrong answer."
+        )
+    if cal.demoted:
+        cal.notes.append(
+            f"{len(cal.demoted)} pattern(s) carry weight 0 after calibration: "
+            f"{', '.join(cal.demoted)}. They still fire and are still shown to an "
+            "analyst; they no longer move a score that gates approval."
         )
     return cal
 
@@ -520,8 +544,130 @@ def samples_from_scenarios(
     return out
 
 
+# ---------------------------------------------------------------------------
+# ATBench: external attack content
+# ---------------------------------------------------------------------------
+#
+# The bundled corpus has three content-attack samples, which is too few to calibrate
+# anything — a perfect AUROC on three samples means the corpus cannot disagree with
+# you. ATBench (Apache-2.0, on Hugging Face as ``AI45Research/ATBench``) supplies 500
+# human-audited trajectories, balanced 250 safe / 250 unsafe.
+#
+# Its risk taxonomy splits exactly along the line this scanner cares about:
+#
+#   injection   indirect_prompt_injection, direct_prompt_injection,
+#               tool_description_injection, malicious_user_instruction_or_jailbreak
+#               -> text payloads a content scanner can see
+#
+#   semantic    corrupted_tool_feedback, unreliable_or_misinformation,
+#               malicious_tool_execution, inherent_agent_failures
+#               -> falsified values and bad behaviour, carrying no textual signal.
+#               Excluded for the same reason vendor-bank fraud is: scoring a content
+#               scanner against them measures the wrong control.
+#
+# Not vendored. Apache-2.0 would permit it, but five megabytes of third-party
+# evaluation data does not belong inside a control plane, and the no-vendor
+# discipline established for RAS-Eval should not get an exception for convenience.
+
+ATBENCH_ENV_VAR = "ATBENCH_PATH"
+
+INJECTION_RISK_SOURCES = frozenset({
+    "indirect_prompt_injection",
+    "direct_prompt_injection",
+    "tool_description_injection",
+    "malicious_user_instruction_or_jailbreak",
+})
+
+
+def atbench_path(path: str | None = None) -> Path | None:
+    """Locate an ATBench ``test.json``, or return None.
+
+    An explicit path is used exclusively — same rule as the RAS-Eval loader, and for
+    the same reason: falling through to the environment on a typo would silently
+    measure different data and report it as what you asked for.
+    """
+    if path:
+        p = Path(path)
+        return p if p.is_file() else None
+    for cand in (os.environ.get(ATBENCH_ENV_VAR), "ATBench500/test.json", "atbench500.json"):
+        if cand and Path(cand).is_file():
+            return Path(cand)
+    return None
+
+
+def _untrusted_text(record: dict[str, Any]) -> str:
+    """Everything in a trajectory that did not originate with the control plane.
+
+    User instructions, tool responses and tool descriptions — the three places an
+    injected payload arrives from. The agent's own reasoning is excluded: a scanner
+    flagging the agent's summary of a payload would be reporting the symptom, and
+    would fire just as readily when the agent correctly refused.
+    """
+    parts: list[str] = []
+    for tool in record.get("tool_used") or []:
+        if isinstance(tool, dict):
+            parts.append(str(tool.get("description") or ""))
+    blocks = record.get("content") or []
+    turns = blocks[0] if (blocks and isinstance(blocks[0], list)) else blocks
+    for turn in turns or []:
+        if isinstance(turn, dict) and turn.get("role") in ("user", "environment"):
+            parts.append(str(turn.get("content") or ""))
+    return "\n".join(t for t in parts if t.strip())
+
+
+def atbench_samples(path: str | None = None) -> list[Sample]:
+    """Content-attack samples from an ATBench snapshot. Empty when absent.
+
+    **One sample per trajectory**, not per turn. Per-turn labelling would inherit the
+    trajectory's verdict on turns carrying no payload, and this module has already
+    produced three wrong conclusions from exactly that kind of label noise. A coarser
+    unit that is unambiguously labelled beats a finer one that is not — at the cost,
+    stated here rather than buried, of being coarser than the single call the gate
+    actually decides on.
+    """
+    src = atbench_path(path)
+    if src is None:
+        return []
+    with src.open() as f:
+        records = json.load(f)
+    if not isinstance(records, list):
+        return []
+
+    out: list[Sample] = []
+    for i, rec in enumerate(records):
+        if not isinstance(rec, dict):
+            continue
+        risk = str(rec.get("risk_source") or "")
+
+        # Labelled by RISK SOURCE, not by ATBench's `label`. Their label answers a
+        # different question than this one: it records whether the *agent behaved
+        # badly*, so a trajectory carrying an injection payload that the agent
+        # correctly resisted is labelled safe. 84 of 127 indirect-injection
+        # trajectories are labelled safe and still contain the payload — using their
+        # label would have put 84 payload-carrying samples in the negative class and
+        # made a correctly-firing scanner look catastrophically noisy.
+        #
+        # A borrowed dataset's label is only usable when it answers your question.
+        # This is the fourth time in this module that assumption cost a wrong
+        # conclusion, and it is the least obvious of the four.
+        payload_present = risk in INJECTION_RISK_SOURCES
+
+        text = _untrusted_text(rec)
+        if not text.strip():
+            continue
+        out.append(Sample(
+            text=text, malicious=payload_present,
+            task=f"atbench-{rec.get('conv_id', i)}",
+            source=f"atbench:{risk or 'unlabelled'}",
+        ))
+    return out
+
+
 def corpus_samples(
-    *, include_external: bool = True, content_only: bool = True
+    *,
+    include_external: bool = True,
+    content_only: bool = True,
+    include_atbench: bool = True,
 ) -> list[Sample]:
     """Labelled samples from the bundled corpus, plus imported traffic if present."""
     from ..bench import all_scenarios
@@ -530,7 +676,10 @@ def corpus_samples(
     scenarios = list(all_scenarios())
     if include_external:
         scenarios += ras_eval_scenarios()
-    return samples_from_scenarios(scenarios, content_only=content_only)
+    samples = samples_from_scenarios(scenarios, content_only=content_only)
+    if include_atbench:
+        samples += atbench_samples()
+    return samples
 
 
 # ---------------------------------------------------------------------------
@@ -599,6 +748,9 @@ __all__ = [
     "Calibration",
     "evaluate",
     "corpus_samples",
+    "atbench_samples",
+    "atbench_path",
+    "INJECTION_RISK_SOURCES",
     "samples_from_scenarios",
     "task_disjoint_split",
     "random_split",
