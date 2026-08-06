@@ -179,6 +179,33 @@ It keeps five states apart, and the distinctions carry the value: a window that 
 
 ---
 
+## Persistence
+
+```python
+from revoco import ControlPlane
+from revoco.store import SqliteStore
+
+store = SqliteStore("/var/lib/revoco/revoco.db")
+cp = ControlPlane(store=store, ...)
+
+report = store.startup_report()      # what this restart means
+print(report.notes)
+```
+
+Four decisions, each with a reason:
+
+**WAL with `synchronous=FULL`.** SQLite's defaults are ambiguous enough that you can't rely on them, and `NORMAL` doesn't survive power loss. For an evidence store that isn't a trade-off — a ledger that silently drops its last entries is precisely the truncation case a self-contained hash chain **cannot** detect, because the remaining prefix still verifies.
+
+**Append-only by triggers, not permissions.** SQLite has no `GRANT`, so the INSERT-only grant you'd use in Postgres isn't available. `BEFORE UPDATE`/`BEFORE DELETE` triggers that `RAISE(ABORT)` are the mechanism, and they bind *any* client — including a `sqlite3` shell, not just this code. Worth stating because the Postgres instinct silently produces no protection here.
+
+**The ledger append and journal write are one transaction.** The correctness question persistence actually raises. Written separately, a crash between them leaves the journal claiming a plan the ledger never recorded — and afterwards nothing can tell you which is true. Also: entries are prepared, persisted, *then* added to the in-memory chain, so the in-memory head can never outrun the durable one.
+
+**No fake freshness after downtime.** The tempting fix for "every proof is stale after an outage" is to stop counting downtime against staleness. That's wrong — an ERP upgrade during the outage is exactly when a spec silently becomes a confident wrong rollback, and a proof that survived on a technicality is a phantom rollback with a certificate. So downtime counts, `startup_report()` says how many proofs went stale and for how long, and `due()` puts them at the front of the queue. Visible and remediated fast beats invisible and assumed good.
+
+`startup_report()` also distinguishes a **broken chain from a restart** — a clean restart loses nothing, so verification failure is never an artefact of restarting and says so in as many words.
+
+---
+
 ## The containment benchmark
 
 ```bash
@@ -298,7 +325,7 @@ This is a **working foundation**, published so it can be read, run, and extended
 - **Intent-drift detection is lexical overlap.** It flags divergence; it does not establish intent.
 - **A hash chain does not detect truncation.** Edits, reorders, and interior deletions break verification; dropping the most recent entries leaves a valid prefix. Anchor the head hash externally — `Ledger.checkpoint()` gives you the value to publish.
 - **In-memory stores are single-process.** `InMemorySessionStore.would_exceed` followed by `commit` is not atomic, so two concurrent calls can both pass a check only one should. A shared store must make that pair atomic.
-- **Nothing persists yet.** The ledger, the reversal journal, and the drill register are all in memory, so they reset on restart. Three consequences worth knowing: the horizon forgets undo windows that are still open, `RecoverabilityRegister`'s freshness window means nothing across deploys, and a restart loses the evidence chain rather than breaking it — which is a different failure from tampering and currently indistinguishable from it. Persisting the ledger needs WAL with `synchronous=FULL` and append-only enforced by triggers (SQLite has no `GRANT`), the ledger append and journal write in one transaction, and a startup grace period so a long outage does not mass-degrade every proof to `IRREVERSIBLE` and block legitimate work.
+- **Persistence is opt-in and single-writer.** Pass `store=SqliteStore(path)` and the ledger, journal and drill history survive a restart; omit it and everything is in memory, which is fine for a test and wrong for anything real. The hash chain is single-writer by construction, so two processes sharing one file will collide on sequence numbers — the store raises rather than overwriting, but it does not coordinate. Postgres with advisory locks is the shape for multi-replica; the interface is small enough to swap.
 - **Control mappings are a self-assessment aid, not a certification** or a legal opinion. NIST AI RMF is voluntary; EU AI Act conformity is assessed against a quality-management system of which logging is one clause.
 
 Every place needing production hardening is marked `# HARDENING:` in the source. Search for it before deploying.

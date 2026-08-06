@@ -175,13 +175,20 @@ class ControlPlane:
         gate_evaluator: GateEvaluator | None = None,
         irreversibility_budget: IrreversibilityBudget | None = None,
         recoverability_register: Any | None = None,
+        store: Any | None = None,
         session_store: SessionStore | None = None,
         scanner: ThreatScanner | None = None,
         detector: DetectionEngine | None = None,
         approval_hook: ApprovalHook | None = None,
         fail_closed: bool = True,
     ) -> None:
+        # Durable store, optional. Without one everything is in memory and a restart
+        # loses the evidence chain rather than breaking it — a different failure from
+        # tampering, and indistinguishable from it. See revoco.store.
+        self.store = store
         self.ledger = Ledger()
+        if store is not None:
+            self.ledger.load_entries(store.load_ledger())
         self.authority = AuthorityEngine(on_event=self._on_authority_event)
         # When a register is supplied, a declared reversibility only survives while
         # a recent drill proves it. See revoco.drills.
@@ -214,11 +221,38 @@ class ControlPlane:
         self._lock = threading.RLock()
 
     # ---- ledger plumbing --------------------------------------------------
+    def _append(
+        self, kind: str, payload: dict[str, Any], *, journal: dict[str, Any] | None = None
+    ) -> Any:
+        """Append to the ledger, durably when a store is configured.
+
+        Order matters: prepare, persist, *then* extend the in-memory chain. Appending
+        first would let the in-memory head run ahead of the durable one, so a crash in
+        between leaves a head hash nothing on disk supports — indistinguishable from
+        truncation to whoever verifies it later.
+
+        When ``journal`` is supplied, the ledger entry and the journal state it
+        describes are written in one transaction. Separately, a crash between the two
+        leaves the journal claiming a plan the ledger never recorded, and afterwards
+        there is no way to tell which is the truth.
+        """
+        if self.store is None:
+            return self.ledger.append(kind, payload)
+        entry = self.ledger.prepare(kind, payload)
+        if journal is not None:
+            self.store.record_reversal(entry, journal)
+        else:
+            self.store.append_ledger(entry)
+        self.ledger.append_prebuilt(entry)
+        return entry
+
     def _on_authority_event(self, kind: str, payload: dict[str, Any]) -> None:
-        self.ledger.append(kind, payload)
+        self._append(kind, payload)
 
     def _on_reversal_event(self, kind: str, payload: dict[str, Any]) -> None:
-        self.ledger.append(kind, payload)
+        # A reversal event whose payload *is* a journal entry gets the atomic path.
+        journal = payload if ("plan" in payload and "state" in payload) else None
+        self._append(kind, payload, journal=journal)
 
     # ---- identity & delegation (thin pass-through) ------------------------
     def register_human(self, name: str, public_key, **kw: Any) -> Principal:
@@ -285,7 +319,7 @@ class ControlPlane:
                     reversibility=Reversibility.UNKNOWN,
                     effective_args=dict(args or {}),
                 )
-                v.ledger_seq = self.ledger.append(ledger_mod.KIND_VERDICT, v.to_dict()).seq
+                v.ledger_seq = self._append(ledger_mod.KIND_VERDICT, v.to_dict()).seq
                 return v
             v = Verdict(
                 action_id="",
@@ -299,7 +333,7 @@ class ControlPlane:
                 reversibility=Reversibility.UNKNOWN,
                 effective_args={},
             )
-            v.ledger_seq = self.ledger.append(ledger_mod.KIND_VERDICT, v.to_dict()).seq
+            v.ledger_seq = self._append(ledger_mod.KIND_VERDICT, v.to_dict()).seq
             return v
 
     def _authorize_inner(
@@ -528,7 +562,7 @@ class ControlPlane:
             if verdict.action_id:
                 self._verdicts[verdict.action_id] = verdict
                 self._args_by_action[verdict.action_id] = raw_args
-        entry = self.ledger.append(ledger_mod.KIND_VERDICT, verdict.to_dict())
+        entry = self._append(ledger_mod.KIND_VERDICT, verdict.to_dict())
         verdict.ledger_seq = entry.seq
         return verdict
 
@@ -749,7 +783,7 @@ class ControlPlane:
             # payroll partner); a missing inverse is a loss to be accounted for.
             "needs_human_to_unblock": list(report.blocked_by_gates),
         }
-        self.ledger.append("containment", out)
+        self._append("containment", out)
         return out
 
     # ---- introspection ----------------------------------------------------

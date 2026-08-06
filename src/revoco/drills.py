@@ -363,12 +363,34 @@ class RecoverabilityRegister:
     and becomes a claim with an expiry date.
     """
 
-    def __init__(self, *, stale_after: float = DEFAULT_STALE_AFTER) -> None:
+    def __init__(
+        self, *, stale_after: float = DEFAULT_STALE_AFTER, store: Any | None = None
+    ) -> None:
         self.stale_after = stale_after
+        self.store = store
         self._by_tool: dict[str, ProvenRecoverability] = {}
         self._lock = threading.Lock()
+        if store is not None:
+            # Reload drill history, so the freshness window means something across
+            # deploys. Downtime deliberately still counts against it — see
+            # SqliteStore.startup_report for why not counting it would be worse.
+            for data in store.load_drills():
+                self._ingest(DrillResult(
+                    id=data["id"], tool=data["tool"],
+                    outcome=DrillOutcome(data["outcome"]),
+                    declared_kind=Reversibility(data["declared_kind"]),
+                    at=float(data["at"]), duration_ms=float(data.get("duration_ms") or 0.0),
+                    canary=data.get("canary", ""), error=data.get("error"),
+                    mismatches=tuple(data.get("mismatches") or ()),
+                    residue=data.get("residue", ""),
+                ))
 
     def record(self, result: DrillResult) -> ProvenRecoverability:
+        if self.store is not None:
+            self.store.record_drill(result.to_dict())
+        return self._ingest(result)
+
+    def _ingest(self, result: DrillResult) -> ProvenRecoverability:
         with self._lock:
             entry = self._by_tool.setdefault(
                 result.tool, ProvenRecoverability(tool=result.tool, stale_after=self.stale_after)

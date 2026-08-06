@@ -137,27 +137,42 @@ class Ledger:
         self._on_append = on_append
 
     # ---- writing ----------------------------------------------------------
+    def prepare(self, kind: str, payload: dict[str, Any]) -> LedgerEntry:
+        """Compute the next entry without adding it to the chain.
+
+        For durable deployments: build the entry, persist it, and only then call
+        :meth:`append_prebuilt`. Appending first and writing second would let an
+        in-memory chain run ahead of the durable one, so a crash in between leaves a
+        head hash nothing on disk supports — which is indistinguishable from
+        truncation to anyone verifying later.
+        """
+        with self._lock:
+            return self._build(kind, payload)
+
+    def _build(self, kind: str, payload: dict[str, Any]) -> LedgerEntry:
+        seq = len(self._entries)
+        prev_hash = self._entries[-1].entry_hash if self._entries else GENESIS_PREV_HASH
+        recorded_at = time.time()
+        partial = LedgerEntry(
+            seq=seq,
+            kind=kind,
+            payload=payload,
+            recorded_at=recorded_at,
+            prev_hash=prev_hash,
+            entry_hash="",
+        )
+        return LedgerEntry(
+            seq=seq,
+            kind=kind,
+            payload=payload,
+            recorded_at=recorded_at,
+            prev_hash=prev_hash,
+            entry_hash=partial.compute_hash(),
+        )
+
     def append(self, kind: str, payload: dict[str, Any]) -> LedgerEntry:
         with self._lock:
-            seq = len(self._entries)
-            prev_hash = self._entries[-1].entry_hash if self._entries else GENESIS_PREV_HASH
-            recorded_at = time.time()
-            partial = LedgerEntry(
-                seq=seq,
-                kind=kind,
-                payload=payload,
-                recorded_at=recorded_at,
-                prev_hash=prev_hash,
-                entry_hash="",
-            )
-            entry = LedgerEntry(
-                seq=seq,
-                kind=kind,
-                payload=payload,
-                recorded_at=recorded_at,
-                prev_hash=prev_hash,
-                entry_hash=partial.compute_hash(),
-            )
+            entry = self._build(kind, payload)
             self._entries.append(entry)
             if self._on_append is not None:
                 try:
