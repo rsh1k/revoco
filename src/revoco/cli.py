@@ -156,6 +156,26 @@ def _cmd_controls(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_calibrate(args: argparse.Namespace) -> int:
+    from .gate.calibrate import compare_splits, corpus_samples, evaluate, render
+
+    samples = corpus_samples(
+        include_external=not args.no_external, content_only=not args.all_attacks
+    )
+    if not samples:
+        print("no samples", file=sys.stderr)
+        return 2
+    cal = evaluate(samples)
+    splits = compare_splits(samples)
+    if args.json:
+        print(json.dumps({"calibration": cal.to_dict(), "splits": splits}, indent=2))
+    else:
+        print(render(cal, splits=splits))
+    # Non-zero on a pattern that fires more on ordinary traffic than on attacks. That
+    # is a weighted vote for the wrong answer, and it should not reach main unnoticed.
+    return 1 if cal.noisy else 0
+
+
 def _cmd_bench(args: argparse.Namespace) -> int:
     from .bench import Harness, all_scenarios, benign, malicious, render, to_dict
 
@@ -283,6 +303,15 @@ def build_parser() -> argparse.ArgumentParser:
     bn.add_argument("--malicious-only", action="store_true")
     bn.add_argument("--benign-only", action="store_true")
     bn.set_defaults(func=_cmd_bench)
+
+    cb = sub.add_parser("calibrate", help="measure the threat scanner against the corpus")
+    cb.add_argument("--json", action="store_true")
+    cb.add_argument("--no-external", action="store_true",
+                    help="exclude imported RAS-Eval traffic")
+    cb.add_argument("--all-attacks", action="store_true",
+                    help="include semantic attacks, which a content scanner cannot see "
+                         "and which make the numbers meaningless")
+    cb.set_defaults(func=_cmd_calibrate)
 
     sf = sub.add_parser("surfaces", help="what the bundled adapters cover")
     sf.add_argument("--gates", action="store_true", help="list every gate to implement")

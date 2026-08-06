@@ -65,6 +65,12 @@ jobs:
         # 14 specs sliding back to "unvalidated" the next time someone edits them.
         run: uv run python scripts/validate_workstation.py
 
+      - name: Threat-scanner calibration
+        # Reported, not gated. The content-attack corpus is three samples, so the
+        # noisy-pattern signal is real but far too thin to fail a build on — and a gate
+        # nobody trusts gets disabled, which is worse than no gate.
+        run: uv run revoco calibrate || true
+
       - name: End-to-end demo
         run: uv run python -m revoco.demo
 

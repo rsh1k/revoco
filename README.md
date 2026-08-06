@@ -206,6 +206,32 @@ Four decisions, each with a reason:
 
 ---
 
+## Measuring the threat scanner
+
+```bash
+revoco calibrate
+```
+
+The scanner's quality used to rest on hand-written probes: I wrote a pattern, I wrote an example that trips it, the test passed. That establishes the regex compiles. It says nothing about whether the *score* separates attacks from ordinary traffic, whether the default threshold sits anywhere sensible, or whether a given pattern carries signal at all.
+
+This follows the protocol from [MCPShield](https://arxiv.org/abs/2605.11053), which studied the same question for tool-call traffic. Two things worth stealing: **report AUROC/AUPRC rather than F1 at a fixed cut** (a single-threshold number can't distinguish a detector that ranks well and is miscalibrated from one that doesn't rank at all — opposite fixes), and **split by task, not at random** (random splits inflated their results by up to 25.8 points through tool-signature memorisation).
+
+**Deliberately not a trainer.** Their best configuration is Sentence-BERT under a tree ensemble at 0.975 AUROC, and their sharpest finding is that feature quality beats architecture. Both true, neither adopted: this scanner stays a transparent set of weighted regexes because its hits have to be explainable to whoever approves the call. A 768-dimensional embedding can't tell an approver *why* it objected.
+
+### What it found
+
+Three findings, and two of them are about the measurement rather than the scanner:
+
+**Every real attack payload is caught, at threshold 4 with zero false positives.** That's the operating point the report names — and it's the strictest one that spends no human attention on legitimate work, which matters because an approver who learns the alerts are usually wrong stops reading them.
+
+**12 of 18 patterns never fire on this corpus.** Unmeasured rather than useless, but a pattern carrying a weight nobody has justified is a liability.
+
+**`dot-dot-slash` fires more on benign traffic than on attacks** — it hits `B25`, a scenario written precisely to carry legitimate `../` paths in build config. Not a corpus bug; that scenario exists to catch exactly this. On this corpus the pattern is a weighted vote for the wrong answer.
+
+**And the honest headline: three attack samples is far too few to calibrate anything.** The AUROC of 1.000 means the corpus cannot disagree with you. The report says so in as many words rather than quoting the number, and `compare_splits` returns *"not measurable"* instead of a figure when a held-out fold contains no attacks. The fix is more content-attack tasks — RAS-Eval ships 3,802 of them — not a threshold change.
+
+---
+
 ## The containment benchmark
 
 ```bash
