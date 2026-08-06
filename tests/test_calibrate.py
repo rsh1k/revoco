@@ -416,3 +416,19 @@ def test_one_pattern_carries_most_of_the_recall():
     top = max(cal.patterns, key=lambda p: p.hits_malicious)
     assert top.label == "ignore-previous-instructions"
     assert top.hits_malicious > 0.5 * cal.n_malicious * 0.8
+
+
+def test_the_noisy_gate_stands_down_below_a_useful_sample_size():
+    """CI proved the previous version of this gate wrong within minutes.
+
+    Without an ATBench snapshot the corpus holds three content attacks, none of which
+    contain `../`, while a benign scenario deliberately does — so `dot-dot-slash` read
+    as noisy and failed the build. The gate was measuring corpus size, not a defect,
+    and the commit enabling it had claimed the check was valid "at any sample size".
+    """
+    from revoco.cli import GATE_MIN_ATTACKS
+
+    assert GATE_MIN_ATTACKS >= 30
+    cal = evaluate(corpus_samples(include_atbench=False))
+    # The thin corpus is exactly the situation the threshold exists for.
+    assert cal.n_malicious < GATE_MIN_ATTACKS

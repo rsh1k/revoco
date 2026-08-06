@@ -156,6 +156,11 @@ def _cmd_controls(args: argparse.Namespace) -> int:
     return 0
 
 
+# Below this many attack samples, a "noisy pattern" verdict reflects which attacks
+# happen to be in the corpus rather than a property of the pattern.
+GATE_MIN_ATTACKS = 30
+
+
 def _cmd_calibrate(args: argparse.Namespace) -> int:
     from .gate.calibrate import compare_splits, corpus_samples, evaluate, render
 
@@ -171,8 +176,23 @@ def _cmd_calibrate(args: argparse.Namespace) -> int:
         print(json.dumps({"calibration": cal.to_dict(), "splits": splits}, indent=2))
     else:
         print(render(cal, splits=splits))
-    # Non-zero on a pattern that fires more on ordinary traffic than on attacks. That
-    # is a weighted vote for the wrong answer, and it should not reach main unnoticed.
+    # Non-zero on a weighted pattern that favours benign traffic — but only when there
+    # are enough attack samples for that verdict to be evidence.
+    #
+    # CI taught this within minutes of the gate being switched on. Without an ATBench
+    # snapshot the corpus holds three content attacks, none containing `../`, while a
+    # benign scenario deliberately does — so `dot-dot-slash` read as noisy and failed
+    # the build. The gate was measuring corpus size, not a defect. Same discipline as
+    # compare_splits refusing to report an inflation figure from a fold with no
+    # positives: below the threshold, report and do not fail.
+    if cal.noisy and cal.n_malicious < GATE_MIN_ATTACKS:
+        print(
+            f"\nnote: {len(cal.noisy)} pattern(s) look noisy, but {cal.n_malicious} "
+            f"attack sample(s) is below the {GATE_MIN_ATTACKS} needed for that to be "
+            "evidence — not failing. Point ATBENCH_PATH at a snapshot to enforce it.",
+            file=sys.stderr,
+        )
+        return 0
     return 1 if cal.noisy else 0
 
 

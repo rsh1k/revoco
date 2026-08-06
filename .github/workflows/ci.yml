@@ -66,10 +66,11 @@ jobs:
         run: uv run python scripts/validate_workstation.py
 
       - name: Threat-scanner calibration
-        # Gated now. With ATBench absent this runs on the bundled corpus alone, which
-        # is thin — but the check is narrow: it fails only when a WEIGHTED pattern
-        # fires more on benign traffic than on attacks, which is a defect at any
-        # sample size. Weight-0 patterns are excluded by construction.
+        # Gated, but the gate stands down below 30 attack samples. ATBench is not
+        # fetched here, so this runs on the bundled corpus and reports without
+        # failing — a noisy-pattern verdict on three attacks reflects which attacks
+        # the corpus happens to contain, not a property of the pattern. Set
+        # ATBENCH_PATH in a job that fetches it to enforce.
         run: uv run revoco calibrate
 
       - name: End-to-end demo
