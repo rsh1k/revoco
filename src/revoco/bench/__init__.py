@@ -32,6 +32,9 @@ Usage::
 """
 
 from .corpus import TECHNIQUES, all_scenarios, benign, by_technique, malicious
+from .external import available as external_available
+from .external import provenance as external_provenance
+from .external import ras_eval_scenarios
 from .harness import DEFAULT_POLICY, Harness, default_policy
 from .report import Metrics, render, score, to_dict
 from .scenario import (
@@ -56,6 +59,10 @@ __all__ = [
     "malicious",
     "benign",
     "by_technique",
+    # external corpora (opt-in, nothing vendored)
+    "ras_eval_scenarios",
+    "external_available",
+    "external_provenance",
     # model
     "Scenario",
     "Step",

@@ -48,11 +48,12 @@ from typing import Any
 
 from ..reversal.model import InverseSpec, ReversalGate, Reversibility
 from ..reversal.registry import InverseRegistry
-from . import cloud, database, devops, identity, saas, sap, workday, workstation
+from . import cloud, database, devops, identity, ras_eval, saas, sap, workday, workstation
 from .cloud import CLOUD_GATES, CLOUD_SPECS, cloud_registry
 from .database import DATABASE_GATES, DATABASE_SPECS, database_registry
 from .devops import DEVOPS_GATES, DEVOPS_SPECS, devops_registry
 from .identity import IDENTITY_GATES, IDENTITY_SPECS, identity_registry
+from .ras_eval import RAS_EVAL_SPECS, ras_eval_registry
 from .saas import SAAS_GATES, SAAS_SPECS, saas_registry
 from .sap import SAP_GATES, SAP_SPECS, sap_registry
 from .workday import WORKDAY_GATES, WORKDAY_SPECS, workday_registry
@@ -149,6 +150,7 @@ def summary(*surfaces: str) -> dict[str, Any]:
 __all__ = [
     # modules
     "sap", "workday", "cloud", "identity", "devops", "saas", "workstation", "database",
+    "ras_eval", "RAS_EVAL_SPECS", "ras_eval_registry",
     # per-surface
     "SAP_SPECS", "SAP_GATES", "sap_registry",
     "WORKDAY_SPECS", "WORKDAY_GATES", "workday_registry",

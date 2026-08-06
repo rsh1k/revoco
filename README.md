@@ -201,7 +201,24 @@ Every malicious technique has a **benign twin on the same tools**, so a policy t
 
 Because it runs a real `ControlPlane` against a simulated world, it doubles as a regression suite for the 91 adapter specs — and it earned that keep immediately, finding six real defects including an inverse that relied on implicit convention and a `Rule` that couldn't express "escalate irreversible work only when consequential".
 
-**Honest about the comparison:** ADR-Bench is ~5× larger, drawn from real enterprise telemetry, and far more imbalanced (6:1 benign vs 2.2:1 here). Detection coverage is their strength; verified recoverability is this one's. Complementary instruments, not competing ones.
+### Importing real benign traffic
+
+Hand-authored benign scenarios have a structural blind spot: they contain the false positives I thought to look for. So the corpus can import benign tasks from a [RAS-Eval](https://github.com/lanzer-tree/RAS-Eval) clone — traffic real models actually produced, with real arguments.
+
+```bash
+git clone https://github.com/lanzer-tree/RAS-Eval /path/to/RAS-Eval
+RAS_EVAL_PATH=/path/to/RAS-Eval revoco bench --external
+```
+
+That takes the corpus to **121 scenarios at 5.7:1 benign-to-malicious** — essentially ADR-Bench's ratio — while holding 0% false positives.
+
+**Nothing is vendored.** RAS-Eval declares no license, so its data is all-rights-reserved by default; the loader reads a clone you fetch yourself and returns nothing when it's absent, so CI never depends on it.
+
+**It found two real bugs on its first run**, at a 16.2% false-positive rate the hand-authored corpus could not have surfaced — because I wrote both the spec and the scenario, and used my own invented argument names in each. `insert_data` takes `db_path`, not the `table` I inferred from the tool's name. `convert_file_to_markdown` takes a `save_path` argument rather than returning `output_path`. In both cases the inverse could never resolve, so every legitimate call raised a phantom rollback. **The same mistake in an SAP adapter would look identical and cost considerably more.**
+
+Two disciplines keep the import honest: a tool this package hasn't classified is **skipped**, not imported as `UNKNOWN`, and a call with no observed arguments is **dropped** rather than imported — both would manufacture findings out of missing metadata rather than out of anything the control plane did. And only the 80 *unique tasks* are imported, not all 640 traces: eight models ran the same tasks, so taking every run would multiply the count with near-duplicates. Padding is the thing this corpus exists not to do.
+
+**Honest about the comparison:** ADR-Bench's 302 tasks come from real enterprise telemetry across 133 MCP servers. The imported traffic here is consumer-domain — alarms, calendars, disk stats, arXiv lookups — so it broadens the benign distribution without reaching the enterprise write surfaces where the money is. Detection coverage is their strength; verified recoverability is this one's. Complementary instruments.
 
 One gap is left visible rather than tuned away: `T09` irreversible fan-out. `PRA01` is a threshold detector, so four one-way wires land before the pattern is visible. The controlled pair `M10`/`M18` measures detection versus the budget on the identical attack, and both stay in the corpus so the difference is attributable.
 

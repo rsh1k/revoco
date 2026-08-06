@@ -171,6 +171,15 @@ def _cmd_bench(args: argparse.Namespace) -> int:
         print("no scenarios matched", file=sys.stderr)
         return 2
 
+    if args.external:
+        from .bench.external import provenance, ras_eval_scenarios
+
+        prov = provenance()
+        extra = ras_eval_scenarios()
+        if not extra:
+            print(f"no external scenarios: {prov.get('note','')}", file=sys.stderr)
+        scenarios = scenarios + extra
+
     results = Harness().run_all(scenarios)
     if args.json:
         print(json.dumps(to_dict(results, include_scenarios=args.verbose), indent=2))
@@ -268,6 +277,9 @@ def build_parser() -> argparse.ArgumentParser:
     bn.add_argument("--verbose", "-v", action="store_true", help="per-step detail")
     bn.add_argument("--json", action="store_true")
     bn.add_argument("--technique", action="append", help="restrict to technique code(s)")
+    bn.add_argument("--external", action="store_true",
+                    help="also include benign scenarios imported from a RAS-Eval clone "
+                         "(set RAS_EVAL_PATH; nothing is vendored)")
     bn.add_argument("--malicious-only", action="store_true")
     bn.add_argument("--benign-only", action="store_true")
     bn.set_defaults(func=_cmd_bench)
