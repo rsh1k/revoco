@@ -42,9 +42,12 @@ Quick start::
     cp.undo(v.action_id, my_executor)          # one action
     cp.contain(grant.id, my_executor)          # revoke the grant, roll back its subtree
 
-This package merges three earlier tools — ``veritrail`` (provenance and signed
-delegation), ``mcp-gate`` (per-call policy enforcement), and ``mnemosyne``
-(memory/context integrity) — and adds the reversal layer that none of them had.
+This package merges two earlier tools — ``veritrail`` (provenance and signed
+delegation) and ``mcp-gate`` (per-call policy enforcement) — and adds the reversal
+layer that neither had. It also borrows a few obfuscation patterns from
+``mnemosyne``, whose memory-integrity architecture stays where it is: revoco governs
+actions, mnemosyne governs what an agent remembers, and running one is not running
+the other.
 """
 
 from .authority import (

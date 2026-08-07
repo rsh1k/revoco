@@ -28,8 +28,10 @@ Revoco merges three earlier tools and adds the layer none of them had:
 |---|---|
 | [`veritrail`](https://github.com/rsh1k/veritrail) | Ed25519 attenuating delegation chains, provenance back to a named human, hash-chained ledger, OWASP ASI detectors |
 | [`mcp-gate`](https://github.com/rsh1k/mcp-gate) | Per-action policy decision point — allow / deny / require\_approval / redact, argument-aware conditions, stateful session budgets |
-| [`mnemosyne`](https://github.com/rsh1k/mnemosyne) | Obfuscation and injection detection over untrusted content |
+| [`mnemosyne`](https://github.com/rsh1k/mnemosyne) | A handful of obfuscation patterns — zero-width, Unicode-tag and bidi characters — and nothing more. Its memory gateway, trust-tier invariant, quarantine and drift baseline **did not move here** and have no equivalent in revoco |
 | **new here** | **The reversal layer: plan an undo *before* the action, execute it after, cascade it across a compromised grant's whole subtree** |
+
+All three remain maintained and Apache-2.0. Two things they still do that revoco does not: `mcp-gate` ships a **stdio MCP proxy**, so it can sit in front of Claude Code or Cursor where revoco has no MCP integration at all; and `mnemosyne` guards *what an agent remembers*, which is a different half of ASI06 from the actions revoco governs.
 
 ---
 
