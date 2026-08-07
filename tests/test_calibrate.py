@@ -8,6 +8,8 @@ needs regression tests.
 
 from __future__ import annotations
 
+import os
+
 import pytest
 
 from revoco.bench import all_scenarios
@@ -432,3 +434,22 @@ def test_the_noisy_gate_stands_down_below_a_useful_sample_size():
     cal = evaluate(corpus_samples(include_atbench=False))
     # The thin corpus is exactly the situation the threshold exists for.
     assert cal.n_malicious < GATE_MIN_ATTACKS
+
+
+def test_the_ci_gate_does_not_fire_on_a_sample_too_small_to_support_it():
+    """Regression guard on a gate I enabled too eagerly.
+
+    `revoco calibrate` began failing CI on `dot-dot-slash`, whose "noisy" verdict came
+    from one benign hit and zero attacks. With real content its lift is 1.67 and it is
+    merely weak. A gate that fires on noise gets disabled, and a disabled gate is
+    worse than no gate — so it now requires enough attack content to mean something.
+    """
+    import subprocess
+    import sys
+
+    env = {k: v for k, v in os.environ.items() if k != "ATBENCH_PATH"}
+    r = subprocess.run(
+        [sys.executable, "-m", "revoco.cli", "calibrate"],
+        capture_output=True, text=True, env=env,
+    )
+    assert r.returncode == 0, r.stdout[-800:] + r.stderr[-400:]
