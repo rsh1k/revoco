@@ -204,6 +204,10 @@ Four decisions, each with a reason:
 
 **No fake freshness after downtime.** The tempting fix for "every proof is stale after an outage" is to stop counting downtime against staleness. That's wrong — an ERP upgrade during the outage is exactly when a spec silently becomes a confident wrong rollback, and a proof that survived on a technicality is a phantom rollback with a certificate. So downtime counts, `startup_report()` says how many proofs went stale and for how long, and `due()` puts them at the front of the queue. Visible and remediated fast beats invisible and assumed good.
 
+**The store persists a chain this package already computed.** Because entries are prepared here and *then* handed to the store, `store.append_ledger(entry)` takes one prebuilt entry — it does not take `(kind, payload)` and it must not re-derive the chain. A store that recomputes would produce a second, different hash for the same action, after which the in-memory ledger and the durable one both verify against themselves and disagree with each other, silently.
+
+> **Name collision worth knowing about.** `revoco.store.SqliteStore` and `veritrail.persistence.SqliteStore` share a class name and are **not** interchangeable: veritrail's `append_ledger(kind, payload)` computes the chain, revoco's `append_ledger(entry)` persists one already computed. Import the one matching whichever package wrote the file. veritrail ≥ 0.3.1 adds `append_prebuilt(entry)` for callers on this side of the contract, and it raises `ChainBroken` on an entry that does not attach rather than inserting it.
+
 `startup_report()` also distinguishes a **broken chain from a restart** — a clean restart loses nothing, so verification failure is never an artefact of restarting and says so in as many words.
 
 ---
