@@ -551,9 +551,23 @@ class ControlPlane:
         return self._finalize(verdict, args)
 
     def _finalize(self, verdict: Verdict, raw_args: dict[str, Any]) -> Verdict:
-        """Strike accounting, ledger append, and bookkeeping."""
+        """Strike accounting, ledger append, and bookkeeping.
+
+        A strike means the agent tried something it was never permitted to do.
+        A declined approval is not that: the policy *offered the decision to a
+        person* and the person said no, which is the control working exactly as
+        designed. Counting those was making the rogue-agent detector measure
+        how often a human exercised judgment, and three sensible refusals in a
+        row quarantined a perfectly well-behaved agent.
+
+        The distinction was harmless while approval prompts were rare and only
+        fired on genuinely irreversible actions. It stopped being harmless once
+        callers began routing ordinary risky-looking work to a human — declining
+        three suggested changes is normal use, not drift.
+        """
+        declined_by_human = verdict.effect is Effect.REQUIRE_APPROVAL
         with self._lock:
-            if not verdict.allowed and verdict.action_id:
+            if not verdict.allowed and verdict.action_id and not declined_by_human:
                 record = self.authority.get_action(verdict.action_id)
                 if record is not None:
                     self._actor_strikes[record.actor_id] = (

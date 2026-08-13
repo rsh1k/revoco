@@ -568,3 +568,57 @@ def test_fail_closed_blocks_on_an_internal_error():
     assert not v.allowed
     assert v.stage == "engine_failure"
     assert cp.verify()                    # the failure itself is on the ledger
+
+
+# ---- strike accounting ----------------------------------------------------
+
+
+def test_declining_an_approval_is_not_a_strike_against_the_agent():
+    """A person saying no is the control working, not the agent misbehaving.
+
+    The rogue-agent detector exists to catch an actor that keeps reaching for
+    things it was never granted. A declined approval is the opposite: the
+    policy deliberately handed the decision to a human, and the human used it.
+    Counting those made the detector measure human caution, so an agent that
+    proposed three risky-but-legitimate changes got quarantined for it.
+    """
+    cp, _store, bot, a_priv, grant, _cfo, _h = build(
+        REVERSIBILITY_FIRST, approval=lambda *a, **k: False)
+
+    for _ in range(5):
+        v = cp.authorize(
+            actor_private_key=a_priv, actor_id=bot.id, delegation_id=grant.id,
+            tool="payments.wire", args={"amount": 10.0}, action="write",
+            description="wire funds",
+        )
+        assert not v.allowed
+        assert v.effect is Effect.REQUIRE_APPROVAL
+
+    assert cp._actor_strikes.get(bot.id, 0) == 0, (
+        "declined approvals accumulated strikes; the agent is being penalised "
+        "for a human's decision")
+
+    # And the agent is still able to work afterwards.
+    ok = cp.authorize(
+        actor_private_key=a_priv, actor_id=bot.id, delegation_id=grant.id,
+        tool="invoices.read", args={"invoice_id": "INV-1"}, action="read",
+        description="read an invoice",
+    )
+    assert ok.allowed, "a well-behaved agent was quarantined by human refusals"
+
+
+def test_out_of_scope_attempts_still_accumulate_strikes():
+    """The exemption above must not disarm the detector for real drift."""
+    cp, _store, bot, a_priv, grant, _cfo, _h = build(PERMISSIVE)
+
+    for _ in range(3):
+        v = cp.authorize(
+            actor_private_key=a_priv, actor_id=bot.id, delegation_id=grant.id,
+            tool="admin.delete_everything", args={}, action="write",
+            description="reach outside the grant",
+        )
+        assert not v.allowed
+        assert v.effect is not Effect.REQUIRE_APPROVAL
+
+    assert cp._actor_strikes.get(bot.id, 0) >= 3, (
+        "an agent repeatedly reaching outside its grant stopped being tracked")
