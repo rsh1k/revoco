@@ -159,8 +159,94 @@ def main() -> int:
     check("exposure concentration is attributed to tools",
           rows["c"]["top_by_consequence"][0][0] == "p.wire")
 
+    test_finality_and_intel()
+
     print(f"\n{'all checks passed' if not failures else str(failures) + ' FAILED'}\n")
     return 1 if failures else 0
+
+
+
+
+def test_finality_and_intel() -> None:
+    """On-chain finality and behavioural intel."""
+    global failures
+    from recoup import finality as F
+    from recoup.intel import analyse as intel_analyse
+
+    print(f"\n{BOLD}on-chain finality{RESET}\n")
+
+    draft = F.OnChainAction(chain="solana", value=50_000, asset="USDC")
+    check("an unsigned transaction is fully reversible",
+          F.reversibility(draft) == "reversible",
+          "stopping it costs nothing, which is the only moment that is true")
+
+    # Solana has no replacement mechanism and carries most agentic payment
+    # volume, so a pending transaction there is genuinely beyond recall.
+    pending_solana = F.OnChainAction(chain="solana", confirmations=0, signed=True)
+    check("pending on a chain with no replacement is irreversible, not compensable",
+          F.reversibility(pending_solana) == "irreversible",
+          "naming a remedy that does not exist is the phantom rollback again")
+
+    pending_eth = F.OnChainAction(chain="ethereum", confirmations=0, signed=True)
+    check("pending where replacement exists is compensable",
+          F.reversibility(pending_eth) == "compensable")
+
+    confirming = F.OnChainAction(chain="bitcoin", confirmations=2, signed=True)
+    check("below finality depth is compensable", F.reversibility(confirming) == "compensable")
+    final = F.OnChainAction(chain="bitcoin", confirmations=6, signed=True)
+    check("at finality depth it is irreversible", F.reversibility(final) == "irreversible")
+
+    ttl = F.time_to_irreversibility(confirming)
+    check("time to irreversibility counts down with confirmations",
+          ttl is not None and abs(ttl - 2400.0) < 1, f"{ttl}s remaining at 2 of 6")
+    check("and is None once final", F.time_to_irreversibility(final) is None)
+
+    h = F.holdback_for(draft, threshold=10_000)
+    check("a large draft payment is held back", h.hold and h.can_still_stop,
+          h.reason[:70])
+    h2 = F.holdback_for(F.OnChainAction(chain="solana", value=5, asset="USDC"),
+                        threshold=10_000)
+    check("a small one is not", not h2.hold)
+    h3 = F.holdback_for(pending_solana, threshold=1)
+    check("a holdback after broadcast is refused rather than pretended",
+          not h3.hold and not h3.can_still_stop,
+          "holding something already in the mempool changes nothing")
+
+    a = F.anchor(final)
+    check("the anchor records finality convention honestly",
+          "convention" in a.get("finality_note", ""),
+          "bitcoin's six confirmations is not a protocol guarantee")
+
+    print(f"\n{BOLD}threat intel{RESET}\n")
+
+    base = ([obs("i.read", "read", "reader")] * 60
+            + [obs("i.read", "read", "payer")] * 40)
+    window = ([obs("i.read", "read", "reader")] * 20
+              + [obs("p.wire", "write", "reader", "irreversible", False)] * 3
+              + [obs("x.tool", "write", "ghost")] * 5)
+    r = intel_analyse(iter(base), iter(window))
+    rules = {f.rule for f in r["findings"]}
+
+    check("a tool never seen before is flagged as drift", "privilege-drift" in rules)
+    drift = next(f for f in r["findings"] if f.rule == "privilege-drift")
+    check("and irreversible drift is high severity", drift.severity == "high",
+          drift.summary[:70])
+    check("it carries an ATLAS technique for interoperability",
+          drift.atlas.startswith("AML."), drift.atlas)
+    check("newly irreversible work is its own finding",
+          "new-irreversible-work" in rules)
+    check("an agent absent from baseline is surfaced", "unknown-agent" in rules,
+          "a new agent nobody mentioned is agent sprawl arriving in person")
+    check("the baseline hazard is stated in the output",
+          "the compromise is the norm" in r["caveat"])
+
+    # An agent with almost no history must not generate drift findings, or the
+    # first day of any deployment is nothing but noise.
+    r2 = intel_analyse(iter([obs("a.read", "read", "newbie")] * 3),
+                       iter([obs("z.write", "write", "newbie")] * 5))
+    check("an agent with too little baseline is excluded, not alerted on",
+          "newbie" in r2["insufficient_baseline"]
+          and not any(f.rule == "privilege-drift" for f in r2["findings"]))
 
 
 if __name__ == "__main__":

@@ -217,6 +217,75 @@ choosing it is a decision rather than an inherited default.
 
 The real fix is SPIFFE SVIDs with mTLS, which is on the list.
 
+## Threat intel from what the agents actually did
+
+`recoup intel` compares a window of the journal against a baseline and reports
+what changed. Everything here is behavioural and deterministic — no model is
+involved, deliberately, because the forensics literature is clear that
+hallucination rates fine for triage aren't acceptable for evidence under
+adversarial challenge. A model can help you *read* these; it must not be what
+produces them.
+
+```
+baseline 550 calls | window 43 calls
+4 finding(s): 2 high, 2 medium
+
+  [high] [AML.T0054] invoice-reader: used 2 tool(s) never seen in baseline:
+         payments.wire, vendors.update — payments.wire cannot be undone
+  [high] [AML.T0053] invoice-reader: took 6 action(s) nothing can undo,
+         having taken none in baseline
+  [medium] [AML.T0058] shadow-bot: absent from baseline entirely
+```
+
+Findings carry MITRE ATLAS technique IDs so they land in a threat model the
+customer already has. ATLAS is explicitly described as reacting to rather than
+predicting agentic technique, so that's a translation, never a claim of coverage.
+
+**The baseline hazard**, stated in the output rather than buried: every detection
+compares against a baseline drawn from the same journal. If the baseline already
+contained the compromise, the compromise is the norm and nothing fires. Agents
+with too little history are excluded rather than alerted on, or the first day of
+any deployment is nothing but noise.
+
+## On-chain actions, where reversibility is a clock
+
+An agent moving virtual assets is the most irreversible thing an agent can do,
+and the research recommends exactly what recoup already is: a deterministic layer
+between an agent's decision and finality.
+
+Reversibility here isn't a label, it's a function of time:
+
+```
+$ recoup finality solana --value 50000 --asset USDC --threshold 10000
+solana draft: reversible, 13s to final — 50,000.00 USDC
+  HOLD: after broadcast on solana there is no mechanism to recall it
+  challenge window 300s — a second party can still veto
+
+$ recoup finality solana --confirmations 0 --value 50000 --asset USDC
+solana pending: irreversible, 13s to final
+  proceed: already pending; a holdback after broadcast changes nothing
+  nothing can stop this now
+```
+
+Thirteen seconds between "hold it" and "nothing can stop this now". That's MTTI
+made literal — elsewhere it's an estimate, here it's the protocol's own schedule.
+
+Solana pending is reported **irreversible, not compensable**, because it has no
+replacement mechanism and carries most agentic payment volume. Naming a remedy
+that doesn't exist is the phantom-rollback failure in a new costume.
+
+### This is not chain analytics
+
+Attributing addresses to real-world entities is a data business built on exchange
+relationships and years of clustering heuristics. Chainalysis, TRM and Elliptic
+own it, and pretending a few hundred lines here competes would be dishonest.
+
+What's defensible is the half nobody else sits in: the moment before broadcast,
+when the transaction is still a proposal and stopping it is free. After broadcast,
+this records an anchor — agent, policy, value, destination, tx hash, committed to
+the Merkle log — so a real tracing tool starts from a point that's provable rather
+than asserted.
+
 ## Proofs, not just a log
 
 With `--log`, every decision is committed to an RFC 6962 Merkle tree and comes
@@ -294,6 +363,7 @@ Early. What works today:
 - The Go enforcer evaluates it, in shadow or enforce mode, over HTTP
 - RFC 6962 Merkle log with inclusion and consistency proofs, verifiable offline
 - `inventory`, `suggest`, `simulate`, `depends`, `exposure` over recorded traffic
+- `intel` behavioural findings mapped to MITRE ATLAS; `finality` for on-chain work
 - 3,960 frozen verdicts matched by both runtimes; 9 of 9 mutations caught
 
 Not built yet: drills, containment, SPIFFE identity, OTel emission. The reversal

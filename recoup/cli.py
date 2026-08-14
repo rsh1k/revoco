@@ -194,6 +194,65 @@ def cmd_exposure(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_intel(args: argparse.Namespace) -> int:
+    from .analyse import read
+    from .intel import analyse as intel_analyse, summarise
+
+    rows = list(read(args.journal))
+    if not rows:
+        print("journal is empty", file=sys.stderr)
+        return 1
+    # Split by position rather than by clock: journals are appended in order, and
+    # a caller who knows the estate changed on a date can pass --split instead.
+    cut = args.split if args.split is not None else int(len(rows) * args.baseline)
+    cut = max(1, min(cut, len(rows) - 1))
+    r = intel_analyse(iter(rows[:cut]), iter(rows[cut:]))
+
+    if args.json:
+        print(json.dumps({
+            "findings": [f.__dict__ for f in r["findings"]],
+            "baseline_calls": r["baseline_calls"],
+            "window_calls": r["window_calls"],
+            "insufficient_baseline": r["insufficient_baseline"],
+            "caveat": r["caveat"]}, indent=2))
+        return 0
+
+    print(f"baseline {r['baseline_calls']:,} calls | window {r['window_calls']:,} calls")
+    print(f"{summarise(r)}\n")
+    for f in r["findings"]:
+        print(f"  {f}")
+        for k, v in f.evidence.items():
+            print(f"        {k}: {v}")
+    if r["insufficient_baseline"]:
+        print(f"\n  too little baseline to judge: {', '.join(r['insufficient_baseline'])}")
+    print(f"\n  {r['caveat']}")
+    return 0
+
+
+def cmd_finality(args: argparse.Namespace) -> int:
+    from .finality import CHAINS, OnChainAction, describe, holdback_for
+
+    if args.chain not in CHAINS:
+        print(f"unknown chain {args.chain!r}; known: {', '.join(sorted(CHAINS))}",
+              file=sys.stderr)
+        return 2
+    a = OnChainAction(chain=args.chain, confirmations=args.confirmations,
+                      signed=args.confirmations >= 0 or args.signed,
+                      value=args.value, asset=args.asset)
+    print(describe(a))
+    h = holdback_for(a, threshold=args.threshold, window_seconds=args.window)
+    verb = "HOLD" if h.hold else "proceed"
+    print(f"  {verb}: {h.reason}")
+    if h.hold:
+        print(f"  challenge window {h.seconds:,.0f}s — a second party can still veto")
+    elif not h.can_still_stop:
+        print("  nothing can stop this now")
+    ch = CHAINS[args.chain]
+    if not ch.absolute:
+        print(f"\n  note: {ch.note}")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(
         prog="recoup",
@@ -233,6 +292,26 @@ def main(argv: list[str] | None = None) -> int:
     e.add_argument("journal")
     e.add_argument("--json", action="store_true")
     e.set_defaults(func=cmd_exposure)
+
+    it = sub.add_parser("intel", help="behavioural findings against a baseline")
+    it.add_argument("journal")
+    it.add_argument("--baseline", type=float, default=0.7,
+                    help="fraction of the journal treated as baseline (default 0.7)")
+    it.add_argument("--split", type=int, default=None,
+                    help="split at this entry instead of a fraction")
+    it.add_argument("--json", action="store_true")
+    it.set_defaults(func=cmd_intel)
+
+    fn = sub.add_parser("finality", help="how reversible an on-chain action is right now")
+    fn.add_argument("chain")
+    fn.add_argument("--confirmations", type=int, default=-1,
+                    help="-1 for not yet broadcast")
+    fn.add_argument("--signed", action="store_true")
+    fn.add_argument("--value", type=float, default=0.0)
+    fn.add_argument("--asset", default="")
+    fn.add_argument("--threshold", type=float, default=10_000.0)
+    fn.add_argument("--window", type=float, default=300.0)
+    fn.set_defaults(func=cmd_finality)
 
     d = sub.add_parser("digest", help="canonical sha256 of a bundle")
     d.add_argument("bundle")
