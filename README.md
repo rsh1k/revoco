@@ -88,6 +88,30 @@ Irreversible tools are never rolled into an allow rule. They get their own
 approval clause, ordered first so it isn't unreachable, because the fact that
 something happened during the window isn't evidence it should have.
 
+**`recoup depends`** — which agents depend on which tools. Answers the ordinary
+question nobody can currently answer: we're deprecating this API, who breaks?
+
+```
+  tool                      agents    calls  depends
+  invoices.read                  2      650  invoice-reader, reconciler
+  vendors.update                 2       43  invoice-reader, payments-bot
+  payments.wire                  1       25 !payments-bot
+```
+
+**`recoup exposure`** — per-agent risk weighted by how hard each call is to take
+back. Counting calls treats a database read and a wire transfer as the same
+event, which is the mistake this whole product exists to correct.
+
+```
+  agent                     calls  exposure   share  no undo
+  reconciler                  310       430   40.1%        0
+  invoice-reader              403       403   37.6%        0
+  payments-bot                 65       240   22.4%       25
+```
+
+`payments-bot` makes 8% of the calls and carries 22% of the exposure. That gap is
+the reason to weight.
+
 **`recoup simulate`** — replay recorded traffic against a candidate policy and
 see exactly what changes before turning it on.
 
@@ -193,6 +217,60 @@ choosing it is a decision rather than an inherited default.
 
 The real fix is SPIFFE SVIDs with mTLS, which is on the list.
 
+## Proofs, not just a log
+
+With `--log`, every decision is committed to an RFC 6962 Merkle tree and comes
+back with a receipt. That buys two things a hash chain can't:
+
+```
+inclusion proof    this decision is in the log with this root      O(log n)
+consistency proof  this log only ever appended since that root     O(log n)
+```
+
+The first matters because of where this runs. Proving one wire transfer was
+authorised shouldn't mean handing an auditor the whole log — and with a Merkle
+tree it doesn't. Six hashes proved one entry among 51.
+
+The second is what catches a rewrite. Pin a root today, ask for a consistency
+proof next quarter, and an operator who deleted an inconvenient entry can't
+produce one.
+
+`recoup-verify` checks either, offline:
+
+```bash
+recoup-verify inclusion   --receipt r.json
+recoup-verify consistency --proof p.json --old-root <the root you pinned>
+```
+
+It links against nothing but the standard library, talks to no server and needs
+no credentials. That's what makes the log evidence rather than a dashboard — if
+it says verified, you didn't have to trust anyone to find out.
+
+Tampering is caught:
+
+```
+$ recoup-verify inclusion --receipt forged.json     # allowed:false -> true
+NOT VERIFIED
+  root mismatch: computed 4dbc22d2…, expected c93e9226…
+```
+
+### Not a blockchain
+
+A Merkle log leaves one gap: an operator could keep two divergent logs and show a
+different one to each party. Blockchain closes that with consensus, at a cost
+that isn't worth paying here. Witness co-signing gets the same guarantee — have
+independent parties counter-sign tree heads, and equivocating means getting every
+witness to lie the same way. `Head` is shaped for that.
+
+The implementation is checked against RFC 6962's published test vectors, then
+exhaustively: every leaf's inclusion proof for every tree size to 64, every
+consistency pair to 48, plus forged leaves, wrong indices, padded proofs and
+truncated proofs.
+
+Two real bugs surfaced doing that, both of which passed on balanced trees and
+failed on ragged ones — which is the worst shape for this kind of bug, because
+hand-picked test sizes tend to be powers of two.
+
 ## Container
 
 The final stage is `scratch`. No shell, no package manager, no libc — one static
@@ -211,14 +289,16 @@ binary is about 5.9 MB.
 
 Early. What works today:
 
-- Policy compiles to a bundle, with a digest that ties a verdict back to the
-  exact policy that produced it
+- Policy compiles to a bundle, with a digest tying a verdict back to the exact
+  policy that produced it
 - The Go enforcer evaluates it, in shadow or enforce mode, over HTTP
-- 3,960 frozen verdicts, matched by both runtimes
-- 9 of 9 mutations caught
+- RFC 6962 Merkle log with inclusion and consistency proofs, verifiable offline
+- `inventory`, `suggest`, `simulate`, `depends`, `exposure` over recorded traffic
+- 3,960 frozen verdicts matched by both runtimes; 9 of 9 mutations caught
 
-Not built yet: drills, the ledger, containment, evidence packs. Those live in
-[revoco](https://github.com/rsh1k/revoco) and aren't wired in here.
+Not built yet: drills, containment, SPIFFE identity, OTel emission. The reversal
+engine and delegation chain live in [revoco](https://github.com/rsh1k/revoco) and
+aren't wired in here yet.
 
 ## Built on
 

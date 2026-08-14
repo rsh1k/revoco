@@ -126,6 +126,39 @@ def main() -> int:
           r2["newly_allowed_calls"] == 10,
           "compares against the recorded verdict, not the shadowed outcome")
 
+    print(f"\n{BOLD}dependencies{RESET}\n")
+
+    from recoup.analyse import consequence_budget, dependencies
+
+    mixed = ([obs("shared.read", "read", "a")] * 10
+             + [obs("shared.read", "read", "b")] * 10
+             + [obs("solo.write", "write", "b")] * 5
+             + [obs("p.wire", "write", "c", "irreversible", False)] * 3)
+    d = dependencies(iter(mixed))
+    check("a tool used by two agents is flagged as shared",
+          d["shared_tools"] == ["shared.read"],
+          "removing it breaks more than one thing")
+    check("a tool used by one agent is not", "solo.write" in d["single_agent_tools"])
+    shared = next(t for t in d["tools"] if t["tool"] == "shared.read")
+    check("dependents are named, not just counted",
+          shared["agents"] == ["a", "b"])
+
+    print(f"\n{BOLD}exposure{RESET}\n")
+
+    b = consequence_budget(iter(mixed))
+    rows = {r["agent_id"]: r for r in b["agents"]}
+    check("an irreversible call weighs more than a reversible one",
+          rows["c"]["consequence"] == 24 and rows["a"]["consequence"] == 10,
+          f"c: 3 irreversible = {rows['c']['consequence']}, "
+          f"a: 10 reversible = {rows['a']['consequence']}")
+    check("so a low-volume agent can still dominate exposure",
+          rows["c"]["consequence"] > rows["a"]["consequence"],
+          "3 calls out-weigh 10, which is the entire point of weighting")
+    check("shares sum to a whole",
+          abs(sum(r["share_pct"] for r in b["agents"]) - 100.0) < 0.2)
+    check("exposure concentration is attributed to tools",
+          rows["c"]["top_by_consequence"][0][0] == "p.wire")
+
     print(f"\n{'all checks passed' if not failures else str(failures) + ' FAILED'}\n")
     return 1 if failures else 0
 

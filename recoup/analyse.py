@@ -303,3 +303,104 @@ def simulate(observations: Iterator[Observation], bundle: dict[str, Any]) -> dic
         "newly_blocked": rows(newly_blocked),
         "newly_allowed": rows(newly_allowed),
     }
+
+
+# ---------------------------------------------------------------------------
+# Two more questions the same stream answers.
+# ---------------------------------------------------------------------------
+
+
+def dependencies(observations: Iterator[Observation]) -> dict[str, Any]:
+    """Which agents depend on which tools, and what breaks if one goes away.
+
+    The question this exists for is the ordinary one nobody can currently
+    answer: "we are deprecating this API next quarter — who breaks?" In an
+    estate where agents were wired up by whoever needed them, that is normally
+    answered by turning the thing off and waiting for complaints.
+
+    A tool used by exactly one agent is a contained change. One used by six,
+    including something that touches payments, is a project.
+    """
+    users: dict[str, set[str]] = defaultdict(set)
+    calls: Counter = Counter()
+    rev: dict[str, str] = {}
+    agent_calls: Counter = Counter()
+
+    for o in observations:
+        users[o.tool].add(o.agent_id)
+        calls[o.tool] += 1
+        agent_calls[o.agent_id] += 1
+        rev[o.tool] = o.reversibility
+
+    tools = []
+    for tool, agents in users.items():
+        tools.append({
+            "tool": tool,
+            "agents": sorted(agents),
+            "agent_count": len(agents),
+            "calls": calls[tool],
+            "reversibility": rev.get(tool, "unknown"),
+        })
+
+    tools.sort(key=lambda t: (-t["agent_count"], -t["calls"]))
+    return {
+        "tools": tools,
+        "single_agent_tools": [t["tool"] for t in tools if t["agent_count"] == 1],
+        "shared_tools": [t["tool"] for t in tools if t["agent_count"] > 1],
+        "agents": dict(agent_calls),
+    }
+
+
+# Relative weight of one call at each reversibility, for consequence budgeting.
+# Not money: an irreversible action is not "eight times more expensive", it is
+# a different kind of thing. The number exists so a budget can be expressed as
+# one figure per agent per day, and the ratios are deliberately coarse because
+# pretending to more precision than this deserves would be worse than the
+# coarseness.
+CONSEQUENCE_WEIGHT = {
+    "reversible": 1,
+    "compensable": 3,
+    "unknown": 8,
+    "irreversible": 8,
+}
+
+
+def consequence_budget(observations: Iterator[Observation]) -> dict[str, Any]:
+    """Per-agent exposure, weighted by how hard each action is to take back.
+
+    Counting calls treats a database read and a wire transfer as the same
+    event, which is exactly the mistake this whole product exists to correct.
+    Weighting by reversibility gives a single figure per agent that a risk
+    owner can put a cap on, in the way a spend limit works — and unlike a spend
+    limit it tracks the thing that actually hurts.
+    """
+    per_agent: dict[str, dict[str, Any]] = defaultdict(
+        lambda: {"calls": 0, "weighted": 0, "irreversible": 0, "tools": Counter()})
+    total_weighted = 0
+
+    for o in observations:
+        w = CONSEQUENCE_WEIGHT.get(o.reversibility, CONSEQUENCE_WEIGHT["unknown"])
+        a = per_agent[o.agent_id]
+        a["calls"] += 1
+        a["weighted"] += w
+        a["tools"][o.tool] += w
+        if o.reversibility in ("irreversible", "unknown"):
+            a["irreversible"] += 1
+        total_weighted += w
+
+    rows = []
+    for agent_id, a in per_agent.items():
+        rows.append({
+            "agent_id": agent_id,
+            "calls": a["calls"],
+            "consequence": a["weighted"],
+            "share_pct": round(100.0 * a["weighted"] / total_weighted, 1)
+            if total_weighted else 0.0,
+            "irreversible_calls": a["irreversible"],
+            # Where the exposure concentrates. Usually one or two tools carry
+            # nearly all of it, which is where a cap should actually sit.
+            "top_by_consequence": a["tools"].most_common(3),
+        })
+    rows.sort(key=lambda r: -r["consequence"])
+    return {"total_consequence": total_weighted, "agents": rows,
+            "weights": CONSEQUENCE_WEIGHT}

@@ -27,12 +27,14 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/rsh1k/recoup/internal/decision"
 	"github.com/rsh1k/recoup/internal/journal"
+	"github.com/rsh1k/recoup/internal/translog"
 )
 
 type mode string
@@ -84,6 +86,23 @@ type server struct {
 	mode    mode
 	counts  *counters
 	journal *journal.Writer
+	log     *translog.Log
+}
+
+// leafFor is the exact bytes committed to the log for one decision. Canonical
+// and self-contained: an auditor holding a receipt must be able to rebuild this
+// byte for byte without asking the operator what it meant. Field order is fixed
+// by the struct, which is why this is a struct and not a map.
+type leaf struct {
+	Tool          string `json:"tool"`
+	Action        string `json:"action"`
+	AgentID       string `json:"agent_id"`
+	Risk          int    `json:"risk"`
+	Reversibility string `json:"reversibility"`
+	Effect        string `json:"effect"`
+	RuleID        string `json:"rule_id"`
+	Allowed       bool   `json:"allowed"`
+	PolicyID      string `json:"policy_id"`
 }
 
 // response is what a caller acts on. `enforced` is reported separately from
@@ -98,6 +117,10 @@ type response struct {
 	Reversibility string `json:"reversibility"`
 	PolicyID      string `json:"policy_id"`
 	ShadowedBlock bool   `json:"shadowed_block,omitempty"`
+	// The receipt. With the leaf bytes and a later proof, a holder can show this
+	// decision is in the log without the operator's cooperation.
+	LeafIndex *int   `json:"leaf_index,omitempty"`
+	Leaf      string `json:"leaf,omitempty"`
 }
 
 func (s *server) decide(w http.ResponseWriter, r *http.Request) {
@@ -143,8 +166,88 @@ func (s *server) decide(w http.ResponseWriter, r *http.Request) {
 		PolicyID: s.bundle.PolicyID,
 	})
 
+	if s.log != nil {
+		body, err := json.Marshal(leaf{
+			Tool: call.Tool, Action: call.Action, AgentID: call.AgentID,
+			Risk: call.Risk, Reversibility: verdict.Reversibility,
+			Effect: string(verdict.Effect), RuleID: verdict.RuleID,
+			Allowed: verdict.Allowed, PolicyID: s.bundle.PolicyID,
+		})
+		if err == nil {
+			idx := s.log.Append(body)
+			resp.LeafIndex, resp.Leaf = &idx, string(body)
+		}
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(resp)
+}
+
+// logHead publishes the current commitment. This is the value a witness
+// co-signs, and the value an auditor pins now to detect a rewrite later.
+func (s *server) logHead(w http.ResponseWriter, _ *http.Request) {
+	if s.log == nil {
+		http.Error(w, "log is not enabled", http.StatusNotFound)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(s.log.Head())
+}
+
+// logProof answers both proof kinds. Inclusion needs index and size;
+// consistency needs from and size.
+func (s *server) logProof(w http.ResponseWriter, r *http.Request) {
+	if s.log == nil {
+		http.Error(w, "log is not enabled", http.StatusNotFound)
+		return
+	}
+	q := r.URL.Query()
+	size, err := strconv.Atoi(q.Get("size"))
+	if err != nil || size < 0 {
+		size = s.log.Size()
+	}
+	head, err := s.log.HeadAt(size)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if from := q.Get("from"); from != "" {
+		m, err := strconv.Atoi(from)
+		if err != nil {
+			http.Error(w, "from must be an integer", http.StatusBadRequest)
+			return
+		}
+		proof, err := s.log.ConsistencyProof(m, size)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		old, _ := s.log.HeadAt(m)
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"kind": "consistency", "from": m, "size": size,
+			"old_root": old.Root, "root": head.Root, "proof": proof,
+		})
+		return
+	}
+
+	index, err := strconv.Atoi(q.Get("index"))
+	if err != nil {
+		http.Error(w, "index must be an integer, or pass from= for consistency",
+			http.StatusBadRequest)
+		return
+	}
+	proof, err := s.log.InclusionProof(index, size)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]any{
+		"kind": "inclusion", "index": index, "size": size,
+		"root": head.Root, "proof": proof,
+	})
 }
 
 func (s *server) stats(w http.ResponseWriter, _ *http.Request) {
@@ -152,6 +255,9 @@ func (s *server) stats(w http.ResponseWriter, _ *http.Request) {
 	out["mode"] = string(s.mode)
 	out["policy_id"] = s.bundle.PolicyID
 	out["journal"] = s.journal.Stats()
+	if s.log != nil {
+		out["log"] = s.log.Head()
+	}
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(out)
 }
@@ -174,6 +280,8 @@ func main() {
 			"append one JSON line per decision here; feeds inventory, suggest and simulate")
 		journalMax = flag.Int64("journal-max-bytes", journal.DefaultMaxSize,
 			"rotate the journal past this size")
+		withLog = flag.Bool("log", false,
+			"commit every decision to an RFC 6962 Merkle log and serve proofs")
 	)
 	flag.Parse()
 
@@ -230,10 +338,17 @@ func main() {
 	}
 	defer func() { _ = jw.Close() }()
 
-	s := &server{bundle: bundle, mode: m, counts: newCounters(), journal: jw}
+	var tlog *translog.Log
+	if *withLog {
+		tlog = translog.New()
+	}
+
+	s := &server{bundle: bundle, mode: m, counts: newCounters(), journal: jw, log: tlog}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/v1/decide", s.decide)
 	mux.HandleFunc("/v1/stats", s.stats)
+	mux.HandleFunc("/v1/log/head", s.logHead)
+	mux.HandleFunc("/v1/log/proof", s.logProof)
 	mux.HandleFunc("/healthz", s.healthz)
 
 	srv := &http.Server{
@@ -251,6 +366,10 @@ func main() {
 	if *journalPath != "" {
 		log.Printf("journalling decisions to %s (tool, action, agent and verdict; "+
 			"never arguments)", *journalPath)
+	}
+	if *withLog {
+		log.Printf("Merkle log on: every decision gets a receipt; " +
+			"GET /v1/log/head to pin a root, /v1/log/proof to check one")
 	}
 	if m == modeShadow {
 		log.Printf("shadow mode: every call is allowed and the verdict recorded. " +

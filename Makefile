@@ -29,7 +29,9 @@ mutate:
 build:
 	$(GO) build -trimpath -ldflags="-s -w -X main.version=$(VERSION)" \
 	  -o bin/recoup-enforcer ./cmd/recoup-enforcer
-	@echo "binary: $$(du -h bin/recoup-enforcer | cut -f1)"
+	$(GO) build -trimpath -ldflags="-s -w" -o bin/recoup-verify ./cmd/recoup-verify
+	@echo "enforcer: $$(du -h bin/recoup-enforcer | cut -f1)"
+	@echo "verifier: $$(du -h bin/recoup-verify | cut -f1)"
 
 image:
 	docker build --build-arg VERSION=$(VERSION) -t recoup-enforcer:$(VERSION) .

@@ -152,6 +152,48 @@ def cmd_simulate(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_depends(args: argparse.Namespace) -> int:
+    from .analyse import dependencies, read
+
+    d = dependencies(read(args.journal))
+    if args.json:
+        print(json.dumps(d, indent=2))
+        return 0
+    print(f"{len(d['tools'])} tool(s) across {len(d['agents'])} agent(s)\n")
+    print(f"  {'tool':<24} {'agents':>7} {'calls':>8}  depends")
+    print(f"  {'-'*24} {'-'*7} {'-'*8}  {'-'*40}")
+    for t in d["tools"]:
+        flag = " !" if t["reversibility"] in ("irreversible", "unknown") else "  "
+        print(f"  {t['tool']:<24} {t['agent_count']:>7} {t['calls']:>8,}{flag}"
+              f"{', '.join(t['agents'])[:40]}")
+    if d["shared_tools"]:
+        print(f"\n  removing any of these breaks more than one agent: "
+              f"{', '.join(d['shared_tools'])}")
+    print("  ! = nothing can undo this")
+    return 0
+
+
+def cmd_exposure(args: argparse.Namespace) -> int:
+    from .analyse import consequence_budget, read
+
+    b = consequence_budget(read(args.journal))
+    if args.json:
+        print(json.dumps(b, indent=2))
+        return 0
+    print(f"consequence weights: {b['weights']}")
+    print(f"total exposure: {b['total_consequence']:,}\n")
+    print(f"  {'agent':<22} {'calls':>8} {'exposure':>9} {'share':>7} {'no undo':>8}  concentrated in")
+    print(f"  {'-'*22} {'-'*8} {'-'*9} {'-'*7} {'-'*8}  {'-'*28}")
+    for a in b["agents"]:
+        top = ", ".join(f"{t}" for t, _ in a["top_by_consequence"][:2])
+        print(f"  {(a['agent_id'] or '(none)'):<22} {a['calls']:>8,} "
+              f"{a['consequence']:>9,} {a['share_pct']:>6.1f}% "
+              f"{a['irreversible_calls']:>8,}  {top[:28]}")
+    print("\n  Exposure counts calls weighted by how hard they are to take back, "
+          "not money.")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(
         prog="recoup",
@@ -181,6 +223,16 @@ def main(argv: list[str] | None = None) -> int:
     m.add_argument("bundle")
     m.add_argument("--json", action="store_true")
     m.set_defaults(func=cmd_simulate)
+
+    dp = sub.add_parser("depends", help="which agents depend on which tools")
+    dp.add_argument("journal")
+    dp.add_argument("--json", action="store_true")
+    dp.set_defaults(func=cmd_depends)
+
+    e = sub.add_parser("exposure", help="per-agent exposure weighted by reversibility")
+    e.add_argument("journal")
+    e.add_argument("--json", action="store_true")
+    e.set_defaults(func=cmd_exposure)
 
     d = sub.add_parser("digest", help="canonical sha256 of a bundle")
     d.add_argument("bundle")
