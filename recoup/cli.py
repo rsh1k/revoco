@@ -253,6 +253,23 @@ def cmd_finality(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_prove(args: argparse.Namespace) -> int:
+    from .prove import analyse, render
+
+    bundle = json.loads(Path(args.bundle).read_text(encoding="utf-8"))
+    r = analyse(bundle, allow_irreversible=frozenset(args.allow_irreversible or ()))
+    print(f"{bundle.get('policy_id', args.bundle)}\n")
+    print(render(r))
+    # Non-zero on a hole so this can gate a deploy. Unreachable rules are a
+    # correctness smell rather than a danger, so they do not fail the build
+    # unless asked.
+    if r.holes:
+        return 1
+    if args.strict and (r.unreachable or not r.complete):
+        return 1
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(
         prog="recoup",
@@ -312,6 +329,14 @@ def main(argv: list[str] | None = None) -> int:
     fn.add_argument("--threshold", type=float, default=10_000.0)
     fn.add_argument("--window", type=float, default=300.0)
     fn.set_defaults(func=cmd_finality)
+
+    pv = sub.add_parser("prove", help="prove properties about a compiled policy")
+    pv.add_argument("bundle")
+    pv.add_argument("--allow-irreversible", nargs="*", metavar="RULE_ID",
+                    help="rule ids permitted to allow work nothing can undo")
+    pv.add_argument("--strict", action="store_true",
+                    help="also fail on unreachable rules or an incomplete search")
+    pv.set_defaults(func=cmd_prove)
 
     d = sub.add_parser("digest", help="canonical sha256 of a bundle")
     d.add_argument("bundle")

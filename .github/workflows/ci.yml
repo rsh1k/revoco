@@ -43,6 +43,10 @@ jobs:
           python-version: "3.12"
       - run: pip install -e .
       - run: python test_analyse.py
+      - name: The example policies must prove clean or fail loudly
+        run: |
+          python -m recoup.cli compile <(echo '{"name":"ci","version":"1","default_effect":"deny","rules":[{"id":"no-undo","effect":"require_approval","reversibility":["irreversible","unknown"]},{"id":"ok","effect":"allow","reversibility":["reversible","compensable"]}]}') -o /tmp/ci-bundle.json
+          python -m recoup.cli prove /tmp/ci-bundle.json --strict
       - run: python -m recoup.generate
       - name: Fixtures must be reproducible
         run: |

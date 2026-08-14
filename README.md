@@ -217,6 +217,41 @@ choosing it is a decision rather than an inherited default.
 
 The real fix is SPIFFE SVIDs with mTLS, which is on the list.
 
+## Prove things about a policy before it decides anything
+
+A policy is an ordered rule list with first-match-wins, which makes it a program,
+and programs have bugs reading doesn't find. `recoup prove` searches the whole
+decision space and reports two things: rules that can never fire, and holes where
+irreversible work is reachable without a human.
+
+```
+$ recoup prove bundle.json
+finance-ops@1
+
+checked 96 distinct calls
+
+  1 hole(s): irreversible work reachable without a human
+    rule reads-are-free: allows an action nothing can undo, no human in the path
+      reached by: Zq7-unmatched-by-anything/read risk=0 threat=0 [unknown]
+```
+
+That's a real bug in a policy from this repo's own examples: an unregistered tool
+classifies as `unknown`, and `reads-are-free` matches it before `one-way-doors`
+ever runs. Exit code is non-zero, so it gates a deploy.
+
+This is decidable because the rule language is small — finite set membership,
+globs over three fields, and comparisons against finitely many thresholds. The
+integers only ever meet the thresholds the policy names, so boundary values
+suffice; reversibility has four values; the string fields are partitioned into
+equivalence classes by the policy's own patterns. Enumerating one witness per
+class answers the question exactly, with no SAT solver and no approximation.
+
+The two questions want opposite caution, so they get it. Claiming a rule is
+unreachable when it isn't means deleting a live control, so that's only reported
+when the search covered the space. Missing a hole means a clean report that isn't
+true, so where a pattern can't be covered the output says **incomplete** rather
+than reporting a safety it hasn't established.
+
 ## Threat intel from what the agents actually did
 
 `recoup intel` compares a window of the journal against a baseline and reports
@@ -364,6 +399,7 @@ Early. What works today:
 - RFC 6962 Merkle log with inclusion and consistency proofs, verifiable offline
 - `inventory`, `suggest`, `simulate`, `depends`, `exposure` over recorded traffic
 - `intel` behavioural findings mapped to MITRE ATLAS; `finality` for on-chain work
+- `prove` static analysis: unreachable rules and holes, with concrete witnesses
 - 3,960 frozen verdicts matched by both runtimes; 9 of 9 mutations caught
 
 Not built yet: drills, containment, SPIFFE identity, OTel emission. The reversal
@@ -376,5 +412,8 @@ aren't wired in here yet.
 gate, the reversal engine, the delegation chain and the ledger. This repo is the
 deployment shape around it: something you can run as a sidecar in your own VPC,
 where regulated data never has to leave.
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) before changing decision logic — a few
+invariants here are load-bearing in ways a single file doesn't show.
 
 Apache-2.0.

@@ -160,6 +160,7 @@ def main() -> int:
           rows["c"]["top_by_consequence"][0][0] == "p.wire")
 
     test_finality_and_intel()
+    test_prove()
 
     print(f"\n{'all checks passed' if not failures else str(failures) + ' FAILED'}\n")
     return 1 if failures else 0
@@ -247,6 +248,81 @@ def test_finality_and_intel() -> None:
     check("an agent with too little baseline is excluded, not alerted on",
           "newbie" in r2["insufficient_baseline"]
           and not any(f.rule == "privilege-drift" for f in r2["findings"]))
+
+
+def test_prove() -> None:
+    """Static analysis of a policy."""
+    global failures
+    from recoup.prove import analyse
+
+    print(f"\n{BOLD}proving policy properties{RESET}\n")
+
+    def rule(rid, effect, **kw):
+        base = {"id": rid, "effect": effect, "tools": ["*"], "actions": ["*"],
+                "agents": ["*"], "require_roles": [], "reversibility": [],
+                "min_risk": None, "max_risk": None, "min_threat_score": None,
+                "redact_fields": [], "reason": rid}
+        base.update(kw)
+        return base
+
+    def bundle(*rules, default="deny", rev=None):
+        return {"schema": 1, "policy_id": "t@1", "default_effect": default,
+                "reversibility": rev or {}, "reversibility_globs": [],
+                "unknown_tool_reversibility": "unknown", "rules": list(rules)}
+
+    # A correct policy: irreversible work is caught before anything allows it.
+    good = bundle(
+        rule("no-undo", "require_approval", reversibility=["irreversible", "unknown"]),
+        rule("ok", "allow", reversibility=["reversible", "compensable"]))
+    r = analyse(good)
+    check("a correct policy reports no holes", not r.holes, f"{r.witnesses_checked} calls")
+    check("and no unreachable rules", not r.unreachable)
+    check("and the search is complete", r.complete)
+
+    # The ordering bug: a broad allow ahead of the irreversible catch.
+    bad = bundle(
+        rule("reads-are-free", "allow", actions=["read"]),
+        rule("no-undo", "require_approval", reversibility=["irreversible", "unknown"]))
+    r = analyse(bad)
+    check("an allow ahead of the irreversible catch is a hole",
+          any(h["rule_id"] == "reads-are-free" for h in r.holes),
+          "this is the bug the prover exists to find")
+    hole = next(h for h in r.holes if h["rule_id"] == "reads-are-free")
+    check("with a concrete witness, not just an assertion",
+          "read" in hole["witness"] and hole["directly_reachable"],
+          hole["witness"])
+
+    # An unreachable rule: fully shadowed by a catch-all ahead of it.
+    shadowed = bundle(
+        rule("catch-all", "require_approval"),
+        rule("never-fires", "allow", tools=["invoices.read"]))
+    r = analyse(shadowed)
+    check("a rule shadowed by a catch-all is reported unreachable",
+          any(u["rule_id"] == "never-fires" for u in r.unreachable))
+    check("naming what shadows it",
+          r.unreachable[0]["shadowed_by"] == ["catch-all"])
+
+    # A permissive default is a hole in its own right.
+    r = analyse(bundle(rule("reads", "allow", actions=["read"]), default="allow"))
+    check("an allow-by-default policy is flagged",
+          any(h["rule_id"] == "__default__" for h in r.holes),
+          "unclassified irreversible work would be permitted")
+
+    # Explicitly blessing a rule silences it, so the exception is recorded in
+    # the command rather than by weakening the check.
+    r = analyse(bad, allow_irreversible=frozenset({"reads-are-free"}))
+    check("an explicitly permitted rule stops being a hole", not r.holes)
+
+    # Soundness in the right direction: an unanalysable glob must make the
+    # report say so rather than quietly claim safety.
+    weird = bundle(rule("odd", "allow", tools=["a*b*c"]))
+    r = analyse(weird)
+    check("an unsynthesisable pattern marks the search incomplete",
+          not r.complete and r.incompleteness,
+          r.incompleteness[0][:60] if r.incompleteness else "")
+    check("and no unreachable claim is made over an incomplete search",
+          not r.unreachable,
+          "deleting a live control on a partial analysis is the worse error")
 
 
 if __name__ == "__main__":
