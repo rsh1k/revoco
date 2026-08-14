@@ -42,6 +42,7 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install -e .
+      - run: python test_analyse.py
       - run: python -m recoup.generate
       - name: Fixtures must be reproducible
         run: |

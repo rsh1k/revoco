@@ -32,6 +32,7 @@ import (
 	"time"
 
 	"github.com/rsh1k/recoup/internal/decision"
+	"github.com/rsh1k/recoup/internal/journal"
 )
 
 type mode string
@@ -79,9 +80,10 @@ func (c *counters) snapshot() map[string]any {
 }
 
 type server struct {
-	bundle *decision.Bundle
-	mode   mode
-	counts *counters
+	bundle  *decision.Bundle
+	mode    mode
+	counts  *counters
+	journal *journal.Writer
 }
 
 // response is what a caller acts on. `enforced` is reported separately from
@@ -133,6 +135,14 @@ func (s *server) decide(w http.ResponseWriter, r *http.Request) {
 		PolicyID:      s.bundle.PolicyID,
 		ShadowedBlock: shadowed && !verdict.Allowed,
 	}
+	s.journal.Append(journal.Entry{
+		Tool: call.Tool, Action: call.Action, AgentID: call.AgentID,
+		Roles: call.Roles, Risk: call.Risk, ThreatScore: call.ThreatScore,
+		Reversibility: verdict.Reversibility, Effect: string(verdict.Effect),
+		RuleID: verdict.RuleID, Allowed: verdict.Allowed, Shadowed: shadowed,
+		PolicyID: s.bundle.PolicyID,
+	})
+
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(resp)
 }
@@ -141,6 +151,7 @@ func (s *server) stats(w http.ResponseWriter, _ *http.Request) {
 	out := s.counts.snapshot()
 	out["mode"] = string(s.mode)
 	out["policy_id"] = s.bundle.PolicyID
+	out["journal"] = s.journal.Stats()
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(out)
 }
@@ -159,6 +170,10 @@ func main() {
 		modeFlag   = flag.String("mode", string(modeShadow), "shadow | enforce")
 		identity   = flag.String("agent-identity", "unverified",
 			"how the caller's agent id is established: unverified | trusted-network")
+		journalPath = flag.String("journal", "",
+			"append one JSON line per decision here; feeds inventory, suggest and simulate")
+		journalMax = flag.Int64("journal-max-bytes", journal.DefaultMaxSize,
+			"rotate the journal past this size")
 	)
 	flag.Parse()
 
@@ -208,7 +223,14 @@ func main() {
 		os.Exit(2)
 	}
 
-	s := &server{bundle: bundle, mode: m, counts: newCounters()}
+	jw, err := journal.Open(*journalPath, *journalMax)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "%v\n", err)
+		os.Exit(1)
+	}
+	defer func() { _ = jw.Close() }()
+
+	s := &server{bundle: bundle, mode: m, counts: newCounters(), journal: jw}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/v1/decide", s.decide)
 	mux.HandleFunc("/v1/stats", s.stats)
@@ -225,6 +247,10 @@ func main() {
 	if *identity == "unverified" {
 		log.Printf("agent identity is unverified: the agent_id field is informational " +
 			"only. No rule in this bundle depends on it.")
+	}
+	if *journalPath != "" {
+		log.Printf("journalling decisions to %s (tool, action, agent and verdict; "+
+			"never arguments)", *journalPath)
 	}
 	if m == modeShadow {
 		log.Printf("shadow mode: every call is allowed and the verdict recorded. " +

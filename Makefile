@@ -21,6 +21,7 @@ fixtures:
 
 test conform:
 	$(GO) test -count=1 ./...
+	$(PY) test_analyse.py
 
 mutate:
 	python3 conformance/mutate.py

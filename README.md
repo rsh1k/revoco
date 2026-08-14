@@ -57,6 +57,70 @@ agent estate is doing work nothing can undo. Then decide what to enforce. It als
 clears security review as a monitoring tool rather than a new control in the
 payment path, which is a different conversation entirely.
 
+## What the estate actually does
+
+The enforcer sees every tool call every agent makes. With `--journal` it writes
+one line per decision, and three commands turn that into something useful.
+
+**`recoup inventory`** — who is doing what, and how much of it can't be taken back.
+
+```
+778 decisions | 3 agent(s) | 4 tool(s)
+
+  agent                     calls  tools  irreversible  top tools
+  invoice-reader              403      2         0.00%  invoices.read, vendors.update
+  reconciler                  310      2         0.00%  invoices.read, invoices.pay
+  payments-bot                 65      2        38.50%  vendors.update, payments.wire
+
+  no undo exists for: payments.wire
+```
+
+**`recoup suggest`** — the tightest policy that would have allowed what actually
+happened. Writing agent policy by hand is the main reason people run everything
+wide open, so this removes the blank page.
+
+It flags what it isn't sure about. On the traffic above it noticed that
+`invoice-reader` wrote to `vendors.update` three times, which is thin evidence
+for a clause — and a read-only bot mutating vendor records is worth a look on its
+own merits.
+
+Irreversible tools are never rolled into an allow rule. They get their own
+approval clause, ordered first so it isn't unreachable, because the fact that
+something happened during the window isn't evidence it should have.
+
+**`recoup simulate`** — replay recorded traffic against a candidate policy and
+see exactly what changes before turning it on.
+
+```
+replayed 778 recorded decisions against tightened@1
+
+  unchanged              775
+  newly blocked            3   (0.39% of traffic)
+  newly allowed            0
+
+  would start blocking:
+          3  vendors.update/write [invoice-reader]  allow -> deny
+```
+
+It uses the same evaluator the enforcer does, so that's the answer the gate would
+really give.
+
+### The hazard, stated plainly
+
+Generating policy from observation bakes in whatever the observation contained.
+If an agent misbehaved during the window, the suggestion blesses it; if the window
+was too short, the policy breaks work that hadn't happened yet. AWS learned this
+publicly with IAM policy generation from CloudTrail.
+
+So `suggest` reports how much evidence sits behind each clause, flags anything
+thin, and prints a warning that it's a draft. It never emits a policy on its own
+authority.
+
+The journal records tool, action, agent and verdict — **never arguments**. Those
+are where the payment amounts and customer records live, and the whole deployment
+argument is that regulated data stays in your VPC. A journal capturing arguments
+would be a second copy of exactly the data nobody wants copied.
+
 ## The conformance suite is the point
 
 Two implementations of one decision will drift. A gate that says *allow* in Go

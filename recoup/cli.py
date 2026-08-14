@@ -73,6 +73,85 @@ def cmd_digest(args: argparse.Namespace) -> int:
     return 0
 
 
+def _fmt_pct(x: float) -> str:
+    return f"{x:.2f}%"
+
+
+def cmd_inventory(args: argparse.Namespace) -> int:
+    from .analyse import inventory, read
+
+    inv = inventory(read(args.journal))
+    if args.json:
+        print(json.dumps(inv, indent=2))
+        return 0
+
+    print(f"{inv['calls']:,} decisions | {len(inv['agents'])} agent(s) | "
+          f"{len(inv['tools'])} tool(s)\n")
+    print(f"  {'agent':<22} {'calls':>8} {'tools':>6} {'irreversible':>13}  top tools")
+    print(f"  {'-'*22} {'-'*8} {'-'*6} {'-'*13}  {'-'*36}")
+    for a in inv["agents"]:
+        top = ", ".join(f"{t}" for t, _ in a["top_tools"][:3])
+        print(f"  {(a['agent_id'] or '(unattributed)'):<22} {a['calls']:>8,} "
+              f"{a['tools']:>6} {_fmt_pct(a['irreversible_share']*100):>13}  {top[:36]}")
+    if inv["irreversible_tools"]:
+        print(f"\n  no undo exists for: {', '.join(inv['irreversible_tools'])}")
+    return 0
+
+
+def cmd_suggest(args: argparse.Namespace) -> int:
+    from .analyse import read, suggest
+
+    out = suggest(read(args.journal), name=args.name)
+    if args.out:
+        Path(args.out).write_text(json.dumps(out["policy"], indent=2) + "\n",
+                                  encoding="utf-8")
+        print(f"wrote {args.out}")
+    else:
+        print(json.dumps(out["policy"], indent=2))
+
+    ev = out["evidence"]
+    print(f"\nfrom {ev['observations']:,} observations across {ev['agents']} agent(s)",
+          file=sys.stderr)
+    for n in out["notes"]:
+        print(f"  · {n}", file=sys.stderr)
+    print(f"\n{out['warning']}", file=sys.stderr)
+    return 0
+
+
+def cmd_simulate(args: argparse.Namespace) -> int:
+    from .analyse import read, simulate
+
+    bundle = json.loads(Path(args.bundle).read_text(encoding="utf-8"))
+    r = simulate(read(args.journal), bundle)
+    if args.json:
+        print(json.dumps(r, indent=2))
+        return 0
+
+    print(f"replayed {r['observations']:,} recorded decisions against "
+          f"{bundle.get('policy_id', args.bundle)}\n")
+    print(f"  unchanged        {r['unchanged']:>9,}")
+    print(f"  newly blocked    {r['newly_blocked_calls']:>9,}   "
+          f"({_fmt_pct(r['would_break_pct'])} of traffic)")
+    print(f"  newly allowed    {r['newly_allowed_calls']:>9,}")
+
+    if r["newly_blocked"]:
+        print(f"\n  would start blocking:")
+        for c in r["newly_blocked"][:15]:
+            print(f"    {c['calls']:>7,}  {c['tool']}/{c['action']} "
+                  f"[{c['agent_id'] or '*'}]  {c['was']} -> {c['now']}")
+    if r["newly_allowed"]:
+        print(f"\n  would start allowing:")
+        for c in r["newly_allowed"][:15]:
+            print(f"    {c['calls']:>7,}  {c['tool']}/{c['action']} "
+                  f"[{c['agent_id'] or '*'}]  {c['was']} -> {c['now']}")
+    # A simulation that reports zero change is usually a mistake in the inputs
+    # rather than a perfect policy, so say so instead of looking like success.
+    if not r["newly_blocked"] and not r["newly_allowed"]:
+        print("\n  nothing changes. Check the journal and the bundle are the pair "
+              "you meant — identical verdicts across real traffic is unusual.")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(
         prog="recoup",
@@ -85,6 +164,23 @@ def main(argv: list[str] | None = None) -> int:
     c.add_argument("--registry", default="ap-starter",
                    help="inverse registry: ap-starter, empty, or a JSON file")
     c.set_defaults(func=cmd_compile)
+
+    i = sub.add_parser("inventory", help="what the agents actually do")
+    i.add_argument("journal", help="path to an enforcer journal")
+    i.add_argument("--json", action="store_true")
+    i.set_defaults(func=cmd_inventory)
+
+    g = sub.add_parser("suggest", help="draft the tightest policy that fits observed traffic")
+    g.add_argument("journal")
+    g.add_argument("-o", "--out")
+    g.add_argument("--name", default="suggested")
+    g.set_defaults(func=cmd_suggest)
+
+    m = sub.add_parser("simulate", help="replay traffic against a candidate bundle")
+    m.add_argument("journal")
+    m.add_argument("bundle")
+    m.add_argument("--json", action="store_true")
+    m.set_defaults(func=cmd_simulate)
 
     d = sub.add_parser("digest", help="canonical sha256 of a bundle")
     d.add_argument("bundle")
