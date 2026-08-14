@@ -1,0 +1,2 @@
+[console_scripts]
+recoup = recoup.cli:main
