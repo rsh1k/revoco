@@ -386,8 +386,15 @@ CrashLoopBackOff.
 make image
 ```
 
-Not yet built in CI, and not yet size-measured on a real registry. The stripped
-binary is about 5.9 MB.
+Verified: **8.77 MB**, runs from `scratch`, and `docker run --entrypoint /bin/sh`
+fails because there is no shell to run.
+
+The static-linking guard earned its keep by being wrong first. It grepped for
+glibc's "not a dynamic executable" and Alpine's musl says "Not a valid dynamic
+program", so it failed the build against a binary that was perfectly static. It
+now checks ldd's exit code, which is portable. A guard that fires on correct
+input is worse than no guard, because the first fix anyone reaches for is
+deleting it.
 
 ## Status
 

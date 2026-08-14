@@ -30,8 +30,19 @@ RUN CGO_ENABLED=0 GOOS=linux go build \
 
 # Verify the binary really is static before it reaches an image with no loader.
 # Finding out at runtime means finding out in a CrashLoopBackOff.
-RUN if ldd /out/recoup-enforcer 2>&1 | grep -qv "not a dynamic executable"; then \
-      echo "binary is dynamically linked; it will not run on scratch" >&2; exit 1; fi
+#
+# Checked by exit code rather than by matching ldd's message, because the message
+# is not portable: glibc says "not a dynamic executable" and musl says "Not a
+# valid dynamic program". The first version of this grepped for the glibc wording
+# and so failed the build on Alpine against a binary that was perfectly static —
+# a guard that fires on correct input is worse than none, because the first fix
+# anyone reaches for is deleting it.
+#
+# ldd exits non-zero for a static binary under both libcs, which is the actual
+# signal.
+RUN if ldd /out/recoup-enforcer >/dev/null 2>&1; then \
+      echo "binary is dynamically linked; it will not run on scratch" >&2; \
+      ldd /out/recoup-enforcer >&2; exit 1; fi
 
 FROM scratch
 COPY --from=build /out/recoup-enforcer /recoup-enforcer
