@@ -130,6 +130,31 @@ func Load(r io.Reader) (*Bundle, error) {
 	return &b, nil
 }
 
+// DependsOnAgentIdentity reports whether any rule's decision can turn on which
+// agent is calling.
+//
+// This exists because the enforcer reads the agent id out of the request body,
+// which means it is a claim and not a fact. Where every rule matches `*`, that
+// costs nothing: the answer is the same whoever asks. Where a rule narrows by
+// agent, the field is load-bearing, and an unauthenticated caller can select
+// which rule applies to it by choosing what to put in the JSON.
+//
+// A control that can be selected by the party it constrains is not a control.
+// The caller checks this at startup and refuses to run rather than serve a
+// policy whose agent conditions only look enforced.
+func (b *Bundle) DependsOnAgentIdentity() []string {
+	var rules []string
+	for _, rule := range b.Rules {
+		for _, pattern := range rule.Agents {
+			if pattern != "*" {
+				rules = append(rules, rule.ID)
+				break
+			}
+		}
+	}
+	return rules
+}
+
 // Classify returns the static reversibility of a tool: exact name first, then
 // glob patterns in registration order, then the bundle's unknown fallback.
 //

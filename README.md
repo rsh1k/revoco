@@ -104,6 +104,31 @@ carrying an argument condition or a spend budget doesn't compile. Dropping the
 condition and emitting the rest would produce a rule matching strictly more calls
 than its author wrote, which is a silent widening of a security policy.
 
+## Agent identity is a claim, not a fact
+
+The enforcer reads `agent_id` out of the request body. Nothing authenticates it,
+so any caller that can reach the port can say it's any agent.
+
+That costs nothing while every rule matches `*` — the answer is the same whoever
+asks. It matters the moment a rule narrows by agent, because then an
+unauthenticated caller gets to pick which rule applies to it. A control the
+constrained party can select isn't a control.
+
+So the enforcer checks at startup and refuses to run rather than serve a policy
+whose agent conditions only look enforced:
+
+```
+refusing to start: 1 rule(s) decide on which agent is calling (named-agent),
+but --agent-identity=unverified means that id is taken from the request
+body and never checked. Any caller could select its own rule.
+```
+
+Pass `--agent-identity=trusted-network` when something upstream already
+authenticates the caller — a mesh doing mTLS, for instance. It's opt-in so that
+choosing it is a decision rather than an inherited default.
+
+The real fix is SPIFFE SVIDs with mTLS, which is on the list.
+
 ## Container
 
 The final stage is `scratch`. No shell, no package manager, no libc — one static

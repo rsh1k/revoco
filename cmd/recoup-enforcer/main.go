@@ -27,6 +27,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -156,6 +157,8 @@ func main() {
 		bundlePath = flag.String("bundle", "", "path to a compiled policy bundle (required)")
 		addr       = flag.String("addr", ":842", "listen address")
 		modeFlag   = flag.String("mode", string(modeShadow), "shadow | enforce")
+		identity   = flag.String("agent-identity", "unverified",
+			"how the caller's agent id is established: unverified | trusted-network")
 	)
 	flag.Parse()
 
@@ -183,6 +186,28 @@ func main() {
 		os.Exit(1)
 	}
 
+	// The agent id arrives in the request body, so by default it is a claim
+	// rather than a fact. That is harmless while every rule matches any agent,
+	// and unacceptable the moment a rule narrows by one: an unauthenticated
+	// caller would get to choose which rule applies to it by choosing what to
+	// send. Rather than serve a policy whose agent conditions merely look
+	// enforced, refuse to start and say exactly which rules are affected.
+	//
+	// `trusted-network` is the escape hatch for a deployment where something
+	// upstream — a service mesh with mTLS, an mesh-injected sidecar — has
+	// already established the identity. It is opt-in and named so that choosing
+	// it is a decision someone made rather than a default they inherited.
+	if affected := bundle.DependsOnAgentIdentity(); len(affected) > 0 && *identity == "unverified" {
+		fmt.Fprintf(os.Stderr,
+			"refusing to start: %d rule(s) decide on which agent is calling (%s),\n"+
+				"but --agent-identity=unverified means that id is taken from the request\n"+
+				"body and never checked. Any caller could select its own rule.\n\n"+
+				"Either remove the agent conditions, or run behind something that\n"+
+				"authenticates the caller and pass --agent-identity=trusted-network.\n",
+			len(affected), strings.Join(affected, ", "))
+		os.Exit(2)
+	}
+
 	s := &server{bundle: bundle, mode: m, counts: newCounters()}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/v1/decide", s.decide)
@@ -197,6 +222,10 @@ func main() {
 
 	log.Printf("recoup-enforcer on %s | policy %s | mode %s | %d rules",
 		*addr, bundle.PolicyID, m, len(bundle.Rules))
+	if *identity == "unverified" {
+		log.Printf("agent identity is unverified: the agent_id field is informational " +
+			"only. No rule in this bundle depends on it.")
+	}
 	if m == modeShadow {
 		log.Printf("shadow mode: every call is allowed and the verdict recorded. " +
 			"GET /v1/stats for what would have been blocked.")

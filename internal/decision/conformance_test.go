@@ -164,3 +164,26 @@ func TestGlobUsesPythonSemantics(t *testing.T) {
 		}
 	}
 }
+
+// The agent id is read from the request body, so it is a claim. A rule that
+// narrows by agent is therefore only a control if something upstream
+// authenticates the caller. This is what lets the enforcer notice and refuse.
+func TestDependsOnAgentIdentity(t *testing.T) {
+	mk := func(agents ...[]string) *Bundle {
+		b := &Bundle{Schema: 1, DefaultEffect: Deny}
+		for i, a := range agents {
+			b.Rules = append(b.Rules, Rule{
+				ID: string(rune('a' + i)), Effect: Allow,
+				Tools: []string{"*"}, Actions: []string{"*"}, Agents: a,
+			})
+		}
+		return b
+	}
+	if got := mk([]string{"*"}, []string{"*"}).DependsOnAgentIdentity(); len(got) != 0 {
+		t.Errorf("rules matching any agent do not depend on identity, got %v", got)
+	}
+	got := mk([]string{"*"}, []string{"ap-*"}, []string{"*", "other"}).DependsOnAgentIdentity()
+	if len(got) != 2 || got[0] != "b" || got[1] != "c" {
+		t.Errorf("want rules b and c flagged, got %v", got)
+	}
+}
