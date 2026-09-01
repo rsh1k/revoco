@@ -70,6 +70,11 @@ class PolicyEngine:
             return False
         if rule.require_roles and not all(principal.has_role(r) for r in rule.require_roles):
             return False
+        if (
+            rule.min_reversibility is not None
+            and reversibility.rank < rule.min_reversibility.rank
+        ):
+            return False
         if rule.reversibility and reversibility not in rule.reversibility:
             return False
         if rule.min_threat_score is not None and scan.score < rule.min_threat_score:
