@@ -1,0 +1,58 @@
+name: ci
+
+# The two runtimes must agree, and the fixtures must be capable of noticing when
+# they don't. Running conformance without the mutation gate would prove only that
+# Go matches the golden files, not that the golden files can tell.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  conformance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+
+      - name: Formatting and vet
+        run: |
+          test -z "$(gofmt -l .)" || { echo "gofmt would change files:"; gofmt -l .; exit 1; }
+          go vet ./...
+
+      - name: Conformance against frozen verdicts
+        run: go test -count=1 ./...
+
+      - name: The fixtures must catch a deliberate bug
+        run: python3 conformance/mutate.py
+        env:
+          GO_BIN: go
+
+  regenerates-cleanly:
+    # Fixtures are generated from revoco. If regenerating produces a diff, either
+    # revoco's behaviour moved or the fixtures were hand-edited. Both need a human.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e .
+      - run: python test_analyse.py
+      - name: The example policies must prove clean or fail loudly
+        run: |
+          python -m recoup.cli compile <(echo '{"name":"ci","version":"1","default_effect":"deny","rules":[{"id":"no-undo","effect":"require_approval","reversibility":["irreversible","unknown"]},{"id":"ok","effect":"allow","reversibility":["reversible","compensable"]}]}') -o /tmp/ci-bundle.json
+          python -m recoup.cli prove /tmp/ci-bundle.json --strict
+      - run: python -m recoup.generate
+      - name: Fixtures must be reproducible
+        run: |
+          if ! git diff --quiet -- conformance/fixtures; then
+            echo "Regenerating the fixtures changed them. Either revoco's decisions"
+            echo "moved, or the golden files were edited by hand. Review the diff:"
+            git --no-pager diff -- conformance/fixtures
+            exit 1
+          fi
