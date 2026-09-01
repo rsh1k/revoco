@@ -51,7 +51,9 @@ rules:
   - id: bounded-reversible-payments
     effect: allow
     tools: [invoices.pay, invoices.approve]
-    reversibility: [reversible, compensable]
+    # A floor, not a set. Listing postures by name means every class added to the
+    # taxonomy silently stops matching this rule and falls through to the default.
+    min_reversibility: compensable
     budget:
       key: payments_total
       field: amount

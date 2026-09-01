@@ -7,6 +7,9 @@ be trustworthy. A new adapter that violates one fails here.
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 import pytest
 
 from revoco import ControlPlane, Scope, crypto
@@ -401,3 +404,33 @@ def test_shell_exec_escalates_every_time():
     )
     assert v.reversibility is Reversibility.UNKNOWN
     assert not v.allowed
+
+
+_EXAMPLES = Path(__file__).resolve().parent.parent / "examples"
+
+
+@pytest.mark.parametrize(
+    "path", sorted(_EXAMPLES.glob("inverses_*.json")), ids=lambda p: p.stem
+)
+def test_a_shipped_registry_still_matches_the_adapter_it_was_exported_from(path):
+    """CI checked these files were *valid*, never that they were *current*.
+
+    Two had silently drifted. The devops export was missing `name` and
+    `namespace` from the arg_map of the Kubernetes delete inverse, so anyone
+    loading it got an undo that could not resolve its own arguments — a phantom
+    rollback shipped as an example. The workstation export still carried the
+    residue prose that `scripts/validate_workstation.py` had already disproved.
+
+    Regenerate with:
+
+        python -c "import json;from revoco.adapters import SURFACES;\
+        from revoco.reversal.registry import InverseRegistry;\
+        [open(f'examples/inverses_{s}.json','w').write(json.dumps(\
+        InverseRegistry(list(SURFACES[s][0])).to_dict(),indent=2,sort_keys=True))\
+        for s in SURFACES]"
+    """
+    surface = path.stem.replace("inverses_", "")
+    live = registry_for(surface).to_dict()
+    assert live == json.loads(path.read_text()), (
+        f"examples/{path.name} has drifted from the {surface} adapter"
+    )
