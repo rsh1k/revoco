@@ -19,6 +19,7 @@ from .engine import (
 from .horizon import Horizon, HorizonEntry
 from .model import (
     CascadeReport,
+    Exemption,
     GateEvaluator,
     InverseExecutor,
     InverseSpec,
@@ -30,6 +31,7 @@ from .model import (
     ReversalPlan,
     ReversalReceipt,
     Reversibility,
+    StateEquivalence,
     StateReader,
     StepResult,
 )
@@ -42,6 +44,8 @@ __all__ = [
     "InverseSpec",
     "InverseStep",
     "ReversalGate",
+    "StateEquivalence",
+    "Exemption",
     "InverseRegistry",
     "ap_starter_registry",
     "AP_STARTER_SPECS",

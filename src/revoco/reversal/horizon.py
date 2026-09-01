@@ -229,7 +229,7 @@ def build(
             continue
 
         plan = e.plan
-        if not plan.kind.is_undoable:
+        if plan.kind.is_one_way:
             standing.append(
                 _entry(e, now=when, reason=f"{plan.kind.value}: no undo path exists")
             )

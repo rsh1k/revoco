@@ -12,6 +12,7 @@ from revoco import ControlPlane, Scope, crypto
 from revoco.bench import Harness
 from revoco.bench.corpus import _MALICIOUS
 from revoco.bench.world import VERB_UPDATE, ToolBinding, World
+from revoco.core.errors import ValidationError
 from revoco.drills import (
     Canary,
     DrillOutcome,
@@ -21,8 +22,15 @@ from revoco.drills import (
     render_report,
 )
 from revoco.gate.policy import load_policy
-from revoco.reversal import InverseRegistry, InverseSpec, Reversibility
+from revoco.reversal import (
+    Exemption,
+    InverseRegistry,
+    InverseSpec,
+    Reversibility,
+    StateEquivalence,
+)
 from revoco.reversal.budget import IrreversibilityBudget
+from revoco.reversal.model import ReversalGate
 
 # ---------------------------------------------------------------------------
 # Irreversibility budget
@@ -176,14 +184,14 @@ _SPEC = InverseSpec(
 )
 
 
-def _canary_world(*, honest: bool = True) -> World:
+def _canary_world(*, honest: bool = True, forward_writes: bool = True) -> World:
     """`honest=False` gives an inverse that accepts the call and writes nothing —
-    the phantom rollback. The forward tool always works, so the drill has a real
-    change to fail to undo."""
+    the phantom rollback. `forward_writes=False` does the same to the forward tool,
+    so the drill has no real change to undo."""
     w = World()
     w.bind(
         ToolBinding("vendor.update_bank", VERB_UPDATE, kind="vendor", id_arg="id",
-                    field_args=("account",)),
+                    field_args=("account",) if forward_writes else ()),
         ToolBinding("vendor.restore_bank", VERB_UPDATE, kind="vendor", id_arg="id",
                     field_args=("account",) if honest else ()),
     )
@@ -244,6 +252,301 @@ def test_a_broken_forward_call_is_distinguished_from_a_broken_inverse():
     r = _runner(w).drill(_canary(w))
     assert r.outcome is DrillOutcome.FORWARD_FAILED
     assert r.outcome.is_alarm
+
+
+_TWO_FIELD = InverseSpec(
+    tool="vendor.update", kind=Reversibility.REVERSIBLE, inverse_tool="vendor.restore",
+    arg_map=(("id", "args.id"), ("account", "snapshot.account"),
+             ("branch", "snapshot.branch")),
+    snapshot_fields=("account", "branch"),
+)
+
+
+def _two_field_drill(*, inverse_writes: tuple[str, ...], static: tuple = (),
+                     forward_writes: tuple[str, ...] = ("account", "branch")):
+    spec = _TWO_FIELD if not static else InverseSpec(
+        tool="vendor.update", kind=Reversibility.REVERSIBLE, inverse_tool="vendor.restore",
+        arg_map=(("id", "args.id"), ("account", "snapshot.account")),
+        static_args=static, snapshot_fields=("account",),
+    )
+    w = World()
+    w.bind(
+        ToolBinding("vendor.update", VERB_UPDATE, kind="vendor", id_arg="id",
+                    field_args=forward_writes),
+        ToolBinding("vendor.restore", VERB_UPDATE, kind="vendor", id_arg="id",
+                    field_args=inverse_writes),
+    )
+    w.seed("vendor", "V1", account="REAL-0001", branch="LONDON")
+    runner = DrillRunner(InverseRegistry([spec]), executor=w.executor,
+                         state_reader=w.state_reader)
+    return runner.drill(Canary(
+        tool="vendor.update",
+        args={"id": "V1", "account": "DRILL-9999", "branch": "DRILL-BRANCH"},
+        verify=lambda: dict(w.get("vendor", "V1") or {}), label="two-field"))
+
+
+def test_an_undo_that_gets_halfway_is_partial_not_a_flat_failure():
+    """`FAILED` and `PARTIAL` are different operational facts.
+
+    An inverse that restores nothing is broken. One that restores the account but
+    leaves the branch pointing at a drill value half-finished the job, and the
+    report has to say which, because the remediation differs.
+    """
+    r = _two_field_drill(inverse_writes=("account",))
+    assert r.outcome is DrillOutcome.PARTIAL
+    assert r.restored == ("account",)
+    assert r.unrestored == ("branch",)
+    assert not r.proves_recoverable
+    assert r.outcome.is_alarm
+    assert "1/2 field(s) restored" in r.summary
+
+
+def test_an_inverse_restoring_nothing_it_moved_is_still_a_flat_failure():
+    r = _two_field_drill(inverse_writes=())
+    assert r.outcome is DrillOutcome.FAILED
+    assert r.restored == ()
+    assert set(r.mismatches) == {"account", "branch"}
+
+
+def test_an_inverse_that_damages_an_untouched_field_is_caught_as_collateral():
+    """The undo overshooting its own blast radius.
+
+    Comparing only before and after cannot separate this from an ordinary
+    incomplete restore, because both simply look wrong. Knowing what the forward
+    action moved is what makes the distinction visible.
+    """
+    r = _two_field_drill(forward_writes=("account",),
+                         inverse_writes=("account", "branch"),
+                         static=(("branch", "CORRUPTED"),))
+    assert r.outcome is DrillOutcome.PARTIAL
+    assert r.collateral == ("branch",)
+    assert "never touched" in r.summary
+
+
+def _equivalence_drill(equivalence, *, inverse_writes=("account",)):
+    w = World()
+    w.bind(
+        ToolBinding("vendor.update", VERB_UPDATE, kind="vendor", id_arg="id",
+                    field_args=("account", "touched_at")),
+        ToolBinding("vendor.restore", VERB_UPDATE, kind="vendor", id_arg="id",
+                    field_args=inverse_writes),
+    )
+    w.seed("vendor", "V1", account="REAL-0001", touched_at="T0")
+    spec = InverseSpec(tool="vendor.update", kind=Reversibility.REVERSIBLE,
+                       inverse_tool="vendor.restore",
+                       arg_map=(("id", "args.id"), ("account", "snapshot.account")),
+                       snapshot_fields=("account",))
+    runner = DrillRunner(InverseRegistry([spec]), executor=w.executor,
+                         state_reader=w.state_reader)
+    return runner.drill(Canary(
+        tool="vendor.update",
+        args={"id": "V1", "account": "DRILL-9999", "touched_at": "T1"},
+        verify=lambda: dict(w.get("vendor", "V1") or {}),
+        equivalence=equivalence))
+
+
+def test_an_exemption_without_a_reason_is_refused():
+    """The knob that could tune any drill to pass has to be argued for in writing."""
+    with pytest.raises(ValidationError):
+        Exemption(field="mtime", reason="")
+
+
+def test_an_exempt_field_is_watched_and_reported_rather_than_ignored():
+    """Exempting is not the same as not looking.
+
+    `touched_at` is excused from having to return, so the drill passes; it is still
+    compared, so what it left behind is named from evidence.
+    """
+    eq = StateEquivalence(name="vendor", exempt=(
+        Exemption(field="touched_at", reason="the restore writes a fresh timestamp"),))
+    r = _equivalence_drill(eq)
+    assert r.outcome is DrillOutcome.PASSED
+    assert r.observed_residue == ("touched_at",)
+
+
+def test_an_exemption_does_not_excuse_the_field_it_was_not_written_for():
+    """A generous ignore-set is how a comparison stops being able to fail. Exempting
+    the timestamp must not also exempt the bank account."""
+    eq = StateEquivalence(name="vendor", exempt=(
+        Exemption(field="touched_at", reason="the restore writes a fresh timestamp"),))
+    r = _equivalence_drill(eq, inverse_writes=())
+    assert r.outcome is DrillOutcome.FAILED
+    assert r.mismatches == ("account",)
+    assert r.observed_residue == ("touched_at",)
+
+
+def test_a_canary_cannot_state_the_comparison_two_different_ways():
+    with pytest.raises(ValidationError):
+        Canary(tool="t", args={}, verify=lambda: {},
+               equivalence=StateEquivalence(name="x"), compare_fields=("a",))
+
+
+def test_the_relation_renders_as_something_publishable_beside_a_result():
+    eq = StateEquivalence(name="workstation", exempt=(
+        Exemption(field="mtime", reason="a write stamps the current time"),))
+    text = eq.describe()
+    assert "workstation" in text and "mtime: a write stamps the current time" in text
+
+
+def test_residue_is_measured_from_the_state_the_canary_reports_but_does_not_compare():
+    """Finding 3 from the workstation validation, made automatic.
+
+    A residue written from vendor documentation is a plausible story. Here the
+    canary reports `touched_at` without comparing it, the undo does not put it
+    back, and the drill names the leftover from evidence — while still passing,
+    because the fields that had to return did.
+    """
+    w = World()
+    w.bind(
+        ToolBinding("vendor.update", VERB_UPDATE, kind="vendor", id_arg="id",
+                    field_args=("account", "touched_at")),
+        ToolBinding("vendor.restore", VERB_UPDATE, kind="vendor", id_arg="id",
+                    field_args=("account",)),
+    )
+    w.seed("vendor", "V1", account="REAL-0001", touched_at="T0")
+    spec = InverseSpec(tool="vendor.update", kind=Reversibility.REVERSIBLE,
+                       inverse_tool="vendor.restore",
+                       arg_map=(("id", "args.id"), ("account", "snapshot.account")),
+                       snapshot_fields=("account",))
+    runner = DrillRunner(InverseRegistry([spec]), executor=w.executor,
+                         state_reader=w.state_reader)
+    r = runner.drill(Canary(
+        tool="vendor.update",
+        args={"id": "V1", "account": "DRILL-9999", "touched_at": "T1"},
+        verify=lambda: dict(w.get("vendor", "V1") or {}),
+        compare_fields=("account",)))
+
+    assert r.outcome is DrillOutcome.PASSED
+    assert r.proves_recoverable
+    assert r.observed_residue == ("touched_at",)
+    assert "residue left in touched_at" in r.summary
+
+
+def test_a_canary_that_compares_everything_reports_no_residue():
+    """Residue lives in the gap between what a canary watches and what it enforces.
+    With no ignore-set there is no gap, and claiming residue would be inventing it."""
+    r = _two_field_drill(inverse_writes=("account", "branch"))
+    assert r.outcome is DrillOutcome.PASSED
+    assert r.observed_residue == ()
+
+
+def _gated_drill(check_at: str, *, evaluator=None):
+    gate = ReversalGate(name="period_open", description="The accounting period must be open.",
+                        check_at=check_at)
+    spec = InverseSpec(tool="vendor.update", kind=Reversibility.REVERSIBLE,
+                       inverse_tool="vendor.restore",
+                       arg_map=(("id", "args.id"), ("account", "snapshot.account")),
+                       snapshot_fields=("account",), gates=(gate,))
+    w = World()
+    w.bind(
+        ToolBinding("vendor.update", VERB_UPDATE, kind="vendor", id_arg="id",
+                    field_args=("account",)),
+        ToolBinding("vendor.restore", VERB_UPDATE, kind="vendor", id_arg="id",
+                    field_args=("account",)),
+    )
+    w.seed("vendor", "V1", account="REAL-0001")
+    runner = DrillRunner(InverseRegistry([spec]), executor=w.executor,
+                         state_reader=w.state_reader, gate_evaluator=evaluator)
+    return runner.drill(Canary(tool="vendor.update",
+                               args={"id": "V1", "account": "DRILL-9999"},
+                               verify=lambda: dict(w.get("vendor", "V1") or {})))
+
+
+def test_an_undo_blocked_by_a_gate_is_unavailable_rather_than_errored():
+    """A closed precondition is a fact about the world, not a fault in the harness.
+
+    It also has to be distinguishable from a working inverse, because a suite that
+    silently skips every gated spec reports the same green as one that covered them.
+    """
+    r = _gated_drill("undo")
+    assert r.outcome is DrillOutcome.UNAVAILABLE
+    assert r.unavailable_reason == "gate_closed"
+    assert not r.proves_recoverable
+    assert r.outcome.is_alarm
+
+
+def test_an_authorize_gate_with_no_evaluator_degrades_to_no_undo_path():
+    """The trap the workstation validation already hit: an unverifiable
+    authorize-phase gate downgrades the classification, and without a distinct
+    outcome the harness looks like it validated a surface it never reached."""
+    r = _gated_drill("authorize")
+    assert r.outcome is DrillOutcome.UNAVAILABLE
+    assert r.unavailable_reason == "no_undo_path"
+
+
+def test_supplying_an_evaluator_lets_the_same_gated_spec_be_proven():
+    r = _gated_drill("undo", evaluator=lambda ctx: True)
+    assert r.outcome is DrillOutcome.PASSED
+    assert r.proves_recoverable
+
+
+def test_an_idempotent_spec_is_never_drilled_at_all():
+    """Before IDEMPOTENT existed a read was REVERSIBLE with a no-op inverse, so
+    drilling it always passed and inflated the proven count with a test that could
+    not fail. It now has nothing to prove and says so."""
+    spec = InverseSpec(tool="fs.read_file", kind=Reversibility.IDEMPOTENT)
+    w = World().bind(ToolBinding("fs.read_file", VERB_UPDATE, kind="f", id_arg="id"))
+    runner = DrillRunner(InverseRegistry([spec]), executor=w.executor)
+    r = runner.drill(Canary(tool="fs.read_file", args={"id": "x"}, verify=lambda: {}))
+    assert r.outcome is DrillOutcome.NOT_DRILLABLE
+    assert not r.outcome.is_alarm
+    assert not r.proves_recoverable
+
+
+def test_an_idempotent_spec_capturing_prior_state_is_incoherent():
+    with pytest.raises(ValidationError):
+        InverseSpec(tool="fs.read_file", kind=Reversibility.IDEMPOTENT,
+                    snapshot_fields=("content",))
+
+
+def test_an_idempotent_spec_must_not_name_an_undo_path():
+    with pytest.raises(ValidationError):
+        InverseSpec(tool="fs.read_file", kind=Reversibility.IDEMPOTENT,
+                    inverse_tool="fs.noop")
+
+
+def test_a_read_outranks_a_write_that_can_be_undone():
+    """The ordering that makes rho mean something. A scope demanding REVERSIBLE
+    admits reads, because an action that changed nothing is not less safe than one
+    that changed something and changed it back."""
+    assert Reversibility.IDEMPOTENT.rank > Reversibility.REVERSIBLE.rank
+    assert not Reversibility.IDEMPOTENT.is_undoable
+    assert not Reversibility.IDEMPOTENT.is_one_way
+
+
+def test_a_read_is_not_counted_as_standing_irreversible_exposure():
+    """The trap in giving IDEMPOTENT no undo path: every risk check that asked
+    `not is_undoable` would start counting reads as one-way damage."""
+    one_way = {k for k in Reversibility if k.is_one_way}
+    assert one_way == {Reversibility.IRREVERSIBLE, Reversibility.UNKNOWN}
+
+
+def test_a_forward_action_that_changes_nothing_cannot_prove_the_inverse_works():
+    """This module's own failure mode, one level up.
+
+    A forward call that succeeds and writes nothing leaves the inverse with nothing
+    to undo, so the first and last reads match and the drill goes green — certifying
+    a tool that was never exercised. Reading state a third time, straight after the
+    forward action, is what separates a real proof from a vacuous one.
+    """
+    w = _canary_world(forward_writes=False)
+    r = _runner(w).drill(_canary(w))
+    assert r.outcome is DrillOutcome.FORWARD_NO_OP
+    assert not r.proves_recoverable
+    assert r.outcome.is_alarm
+    assert "never exercised" in (r.error or "")
+
+
+def test_a_vacuous_drill_is_not_banked_as_proof_by_the_register():
+    """The consequence if the guard were missing: a phantom proof that survives."""
+    reg = RecoverabilityRegister(stale_after=3600.0)
+    w = _canary_world(forward_writes=False)
+    reg.record(_runner(w).drill(_canary(w)))
+    assert not reg.is_proven("vendor.update_bank")
+    assert (
+        reg.classify_hook("vendor.update_bank", Reversibility.REVERSIBLE)
+        is Reversibility.IRREVERSIBLE
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -435,5 +738,59 @@ def test_render_report_separates_failing_from_stale_from_proven():
     w = _canary_world(honest=False)
     reg.record(_runner(w).drill(_canary(w)))
     out = render_report(reg)
-    assert "failing their drill" in out
+    assert "ran and did not restore" in out
     assert "hypothesis" in out
+
+
+def test_the_three_kinds_of_alarm_are_reported_and_prioritised_apart():
+    """They need three different people.
+
+    A spec whose inverse does not restore is the spec author's problem. One whose
+    undo is blocked is the integration's. One whose canary never moved anything is
+    the harness's — and sending someone to the spec for that finds nothing wrong.
+    """
+    reg = RecoverabilityRegister(stale_after=86_400.0)
+
+    broken = _canary_world(honest=False)                 # vendor.update_bank -> FAILED
+    reg.record(_runner(broken).drill(_canary(broken)))
+    reg.record(_gated_drill("undo"))                     # vendor.update     -> UNAVAILABLE
+
+    # A canary whose forward action moves nothing: the harness's problem, not the
+    # spec's. Distinct tool name, or it would overwrite one of the two above.
+    noop = World().bind(
+        ToolBinding("vendor.touch", VERB_UPDATE, kind="vendor", id_arg="id",
+                    field_args=()),
+        ToolBinding("vendor.untouch", VERB_UPDATE, kind="vendor", id_arg="id",
+                    field_args=("account",)),
+    ).seed("vendor", "V2", account="REAL-0002")
+    noop_spec = InverseSpec(tool="vendor.touch", kind=Reversibility.REVERSIBLE,
+                            inverse_tool="vendor.untouch",
+                            arg_map=(("id", "args.id"), ("account", "snapshot.account")),
+                            snapshot_fields=("account",))
+    reg.record(DrillRunner(InverseRegistry([noop_spec]), executor=noop.executor,
+                           state_reader=noop.state_reader).drill(
+        Canary(tool="vendor.touch", args={"id": "V2", "account": "X"},
+               verify=lambda: dict(noop.get("vendor", "V2") or {}))))
+
+    rep = reg.report()
+    assert (rep["failing"], rep["blocked"], rep["untested"]) == (1, 1, 1)
+    assert rep["alarming"] == 3
+
+    urgency = {d.tool: d.urgency for d in reg.due(rep["tools"].keys())}
+    assert set(urgency.values()) == {"failing", "blocked", "untested"}
+
+    out = render_report(reg)
+    assert "could not run at all" in out
+    assert "fix the canary, not the spec" in out
+
+
+def test_a_read_says_it_has_nothing_to_undo_rather_than_claiming_irreversibility():
+    reg = RecoverabilityRegister(stale_after=86_400.0)
+    spec = InverseSpec(tool="fs.read_file", kind=Reversibility.IDEMPOTENT)
+    w = World().bind(ToolBinding("fs.read_file", VERB_UPDATE, kind="f", id_arg="id"))
+    runner = DrillRunner(InverseRegistry([spec]), executor=w.executor)
+    reg.record(runner.drill(Canary(tool="fs.read_file", args={"id": "x"},
+                                   verify=lambda: {})))
+    status = reg.get("fs.read_file").status()
+    assert status == "not drillable (nothing to undo)"
+    assert reg.due(["fs.read_file"]) == []

@@ -69,6 +69,7 @@ from .model import Reversibility
 # but for accounting purposes the worst case is that it turns out irreversible, and
 # charging above full price would let a single unclassified read exhaust a budget.
 DEFAULT_WEIGHTS: dict[Reversibility, float] = {
+    Reversibility.IDEMPOTENT: 0.0,
     Reversibility.REVERSIBLE: 0.0,
     Reversibility.COMPENSABLE: 0.25,
     Reversibility.IRREVERSIBLE: 1.0,
