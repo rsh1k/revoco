@@ -101,3 +101,74 @@ jobs:
         with:
           name: dist
           path: dist/
+
+  # ---------------------------------------------------------------------------
+  # The enforcer. These jobs are the reason the two projects share a repository:
+  # a change to revoco's rule language now fails recoup's conformance in the same
+  # CI run that introduced it, rather than in a different repo whenever someone
+  # next bumped the dependency. That gap already shipped a bug once — a floor-only
+  # rule compiled to an empty posture list, which the enforcer reads as "any
+  # posture", silently widening an allow rule to admit irreversible work.
+  # ---------------------------------------------------------------------------
+  enforcer:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: recoup
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+
+      - name: Formatting and vet
+        run: |
+          test -z "$(gofmt -l .)" || { echo "gofmt would change files:"; gofmt -l .; exit 1; }
+          go vet ./...
+
+      - name: Conformance against frozen verdicts
+        run: go test -count=1 ./...
+
+      - name: The fixtures must catch a deliberate bug
+        run: python3 conformance/mutate.py
+        env:
+          GO_BIN: go
+
+  enforcer-agrees-with-revoco:
+    # The fixtures are generated from revoco's own engine. Regenerating them
+    # against the revoco in *this tree* — not the one on PyPI — is what makes a
+    # rule-language change visible here immediately. A diff means revoco's
+    # decisions moved or the golden files were hand-edited; both need a human.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install both packages from the tree
+        run: |
+          pip install -e .
+          pip install -e ./recoup
+
+      - name: Control-plane checks
+        working-directory: recoup
+        run: python test_analyse.py
+
+      - name: A compiled policy must prove clean or fail loudly
+        working-directory: recoup
+        run: |
+          python -m recoup.cli compile <(echo '{"name":"ci","version":"1","default_effect":"deny","rules":[{"id":"no-undo","effect":"require_approval","reversibility":["irreversible","unknown"]},{"id":"ok","effect":"allow","min_reversibility":"compensable"}]}') -o /tmp/ci-bundle.json
+          python -m recoup.cli prove /tmp/ci-bundle.json --strict
+
+      - name: Fixtures must reproduce from this tree's revoco
+        working-directory: recoup
+        run: |
+          python -m recoup.generate
+          if ! git diff --quiet -- conformance/fixtures; then
+            echo "Regenerating the fixtures changed them. Either revoco's decisions"
+            echo "moved, or the golden files were edited by hand. Review the diff:"
+            git --no-pager diff -- conformance/fixtures
+            exit 1
+          fi

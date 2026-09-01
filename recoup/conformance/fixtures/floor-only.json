@@ -1,0 +1,3146 @@
+{
+  "bundle": {
+    "default_effect": "deny",
+    "policy_id": "floor-only@0",
+    "reversibility": {
+      "email.send": "irreversible",
+      "invoices.approve": "reversible",
+      "invoices.pay": "compensable",
+      "invoices.read": "idempotent",
+      "payments.wire": "irreversible",
+      "vendors.create": "compensable",
+      "vendors.update": "reversible"
+    },
+    "reversibility_globs": [],
+    "rules": [
+      {
+        "actions": [
+          "*"
+        ],
+        "agents": [
+          "*"
+        ],
+        "effect": "allow",
+        "id": "safe-enough",
+        "max_risk": null,
+        "min_reversibility": "compensable",
+        "min_risk": null,
+        "min_threat_score": null,
+        "reason": "recoverable enough to proceed without a human",
+        "redact_fields": [],
+        "require_roles": [],
+        "reversibility": [],
+        "tools": [
+          "*"
+        ]
+      }
+    ],
+    "schema": 2,
+    "unknown_tool_reversibility": "unknown"
+  },
+  "cases": [
+    {
+      "action": "read",
+      "agent_id": "ap-bot",
+      "expect": {
+        "allowed": true,
+        "effect": "allow",
+        "reversibility": "idempotent",
+        "rule_id": "safe-enough"
+      },
+      "risk": 0,
+      "roles": [],
+      "threat_score": 0,
+      "tool": "invoices.read"
+    },
+    {
+      "action": "read",
+      "agent_id": "ap-bot",
+      "expect": {
+        "allowed": true,
+        "effect": "allow",
+        "reversibility": "idempotent",
+        "rule_id": "safe-enough"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk"
+      ],
+      "threat_score": 0,
+      "tool": "invoices.read"
+    },
+    {
+      "action": "read",
+      "agent_id": "ap-bot",
+      "expect": {
+        "allowed": true,
+        "effect": "allow",
+        "reversibility": "idempotent",
+        "rule_id": "safe-enough"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk",
+        "approver"
+      ],
+      "threat_score": 0,
+      "tool": "invoices.read"
+    },
+    {
+      "action": "read",
+      "agent_id": "other-bot",
+      "expect": {
+        "allowed": true,
+        "effect": "allow",
+        "reversibility": "idempotent",
+        "rule_id": "safe-enough"
+      },
+      "risk": 0,
+      "roles": [],
+      "threat_score": 0,
+      "tool": "invoices.read"
+    },
+    {
+      "action": "read",
+      "agent_id": "other-bot",
+      "expect": {
+        "allowed": true,
+        "effect": "allow",
+        "reversibility": "idempotent",
+        "rule_id": "safe-enough"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk"
+      ],
+      "threat_score": 0,
+      "tool": "invoices.read"
+    },
+    {
+      "action": "read",
+      "agent_id": "other-bot",
+      "expect": {
+        "allowed": true,
+        "effect": "allow",
+        "reversibility": "idempotent",
+        "rule_id": "safe-enough"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk",
+        "approver"
+      ],
+      "threat_score": 0,
+      "tool": "invoices.read"
+    },
+    {
+      "action": "write",
+      "agent_id": "ap-bot",
+      "expect": {
+        "allowed": true,
+        "effect": "allow",
+        "reversibility": "idempotent",
+        "rule_id": "safe-enough"
+      },
+      "risk": 0,
+      "roles": [],
+      "threat_score": 0,
+      "tool": "invoices.read"
+    },
+    {
+      "action": "write",
+      "agent_id": "ap-bot",
+      "expect": {
+        "allowed": true,
+        "effect": "allow",
+        "reversibility": "idempotent",
+        "rule_id": "safe-enough"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk"
+      ],
+      "threat_score": 0,
+      "tool": "invoices.read"
+    },
+    {
+      "action": "write",
+      "agent_id": "ap-bot",
+      "expect": {
+        "allowed": true,
+        "effect": "allow",
+        "reversibility": "idempotent",
+        "rule_id": "safe-enough"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk",
+        "approver"
+      ],
+      "threat_score": 0,
+      "tool": "invoices.read"
+    },
+    {
+      "action": "write",
+      "agent_id": "other-bot",
+      "expect": {
+        "allowed": true,
+        "effect": "allow",
+        "reversibility": "idempotent",
+        "rule_id": "safe-enough"
+      },
+      "risk": 0,
+      "roles": [],
+      "threat_score": 0,
+      "tool": "invoices.read"
+    },
+    {
+      "action": "write",
+      "agent_id": "other-bot",
+      "expect": {
+        "allowed": true,
+        "effect": "allow",
+        "reversibility": "idempotent",
+        "rule_id": "safe-enough"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk"
+      ],
+      "threat_score": 0,
+      "tool": "invoices.read"
+    },
+    {
+      "action": "write",
+      "agent_id": "other-bot",
+      "expect": {
+        "allowed": true,
+        "effect": "allow",
+        "reversibility": "idempotent",
+        "rule_id": "safe-enough"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk",
+        "approver"
+      ],
+      "threat_score": 0,
+      "tool": "invoices.read"
+    },
+    {
+      "action": "admin",
+      "agent_id": "ap-bot",
+      "expect": {
+        "allowed": true,
+        "effect": "allow",
+        "reversibility": "idempotent",
+        "rule_id": "safe-enough"
+      },
+      "risk": 0,
+      "roles": [],
+      "threat_score": 0,
+      "tool": "invoices.read"
+    },
+    {
+      "action": "admin",
+      "agent_id": "ap-bot",
+      "expect": {
+        "allowed": true,
+        "effect": "allow",
+        "reversibility": "idempotent",
+        "rule_id": "safe-enough"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk"
+      ],
+      "threat_score": 0,
+      "tool": "invoices.read"
+    },
+    {
+      "action": "admin",
+      "agent_id": "ap-bot",
+      "expect": {
+        "allowed": true,
+        "effect": "allow",
+        "reversibility": "idempotent",
+        "rule_id": "safe-enough"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk",
+        "approver"
+      ],
+      "threat_score": 0,
+      "tool": "invoices.read"
+    },
+    {
+      "action": "admin",
+      "agent_id": "other-bot",
+      "expect": {
+        "allowed": true,
+        "effect": "allow",
+        "reversibility": "idempotent",
+        "rule_id": "safe-enough"
+      },
+      "risk": 0,
+      "roles": [],
+      "threat_score": 0,
+      "tool": "invoices.read"
+    },
+    {
+      "action": "admin",
+      "agent_id": "other-bot",
+      "expect": {
+        "allowed": true,
+        "effect": "allow",
+        "reversibility": "idempotent",
+        "rule_id": "safe-enough"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk"
+      ],
+      "threat_score": 0,
+      "tool": "invoices.read"
+    },
+    {
+      "action": "admin",
+      "agent_id": "other-bot",
+      "expect": {
+        "allowed": true,
+        "effect": "allow",
+        "reversibility": "idempotent",
+        "rule_id": "safe-enough"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk",
+        "approver"
+      ],
+      "threat_score": 0,
+      "tool": "invoices.read"
+    },
+    {
+      "action": "read",
+      "agent_id": "ap-bot",
+      "expect": {
+        "allowed": true,
+        "effect": "allow",
+        "reversibility": "compensable",
+        "rule_id": "safe-enough"
+      },
+      "risk": 0,
+      "roles": [],
+      "threat_score": 0,
+      "tool": "invoices.pay"
+    },
+    {
+      "action": "read",
+      "agent_id": "ap-bot",
+      "expect": {
+        "allowed": true,
+        "effect": "allow",
+        "reversibility": "compensable",
+        "rule_id": "safe-enough"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk"
+      ],
+      "threat_score": 0,
+      "tool": "invoices.pay"
+    },
+    {
+      "action": "read",
+      "agent_id": "ap-bot",
+      "expect": {
+        "allowed": true,
+        "effect": "allow",
+        "reversibility": "compensable",
+        "rule_id": "safe-enough"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk",
+        "approver"
+      ],
+      "threat_score": 0,
+      "tool": "invoices.pay"
+    },
+    {
+      "action": "read",
+      "agent_id": "other-bot",
+      "expect": {
+        "allowed": true,
+        "effect": "allow",
+        "reversibility": "compensable",
+        "rule_id": "safe-enough"
+      },
+      "risk": 0,
+      "roles": [],
+      "threat_score": 0,
+      "tool": "invoices.pay"
+    },
+    {
+      "action": "read",
+      "agent_id": "other-bot",
+      "expect": {
+        "allowed": true,
+        "effect": "allow",
+        "reversibility": "compensable",
+        "rule_id": "safe-enough"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk"
+      ],
+      "threat_score": 0,
+      "tool": "invoices.pay"
+    },
+    {
+      "action": "read",
+      "agent_id": "other-bot",
+      "expect": {
+        "allowed": true,
+        "effect": "allow",
+        "reversibility": "compensable",
+        "rule_id": "safe-enough"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk",
+        "approver"
+      ],
+      "threat_score": 0,
+      "tool": "invoices.pay"
+    },
+    {
+      "action": "write",
+      "agent_id": "ap-bot",
+      "expect": {
+        "allowed": true,
+        "effect": "allow",
+        "reversibility": "compensable",
+        "rule_id": "safe-enough"
+      },
+      "risk": 0,
+      "roles": [],
+      "threat_score": 0,
+      "tool": "invoices.pay"
+    },
+    {
+      "action": "write",
+      "agent_id": "ap-bot",
+      "expect": {
+        "allowed": true,
+        "effect": "allow",
+        "reversibility": "compensable",
+        "rule_id": "safe-enough"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk"
+      ],
+      "threat_score": 0,
+      "tool": "invoices.pay"
+    },
+    {
+      "action": "write",
+      "agent_id": "ap-bot",
+      "expect": {
+        "allowed": true,
+        "effect": "allow",
+        "reversibility": "compensable",
+        "rule_id": "safe-enough"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk",
+        "approver"
+      ],
+      "threat_score": 0,
+      "tool": "invoices.pay"
+    },
+    {
+      "action": "write",
+      "agent_id": "other-bot",
+      "expect": {
+        "allowed": true,
+        "effect": "allow",
+        "reversibility": "compensable",
+        "rule_id": "safe-enough"
+      },
+      "risk": 0,
+      "roles": [],
+      "threat_score": 0,
+      "tool": "invoices.pay"
+    },
+    {
+      "action": "write",
+      "agent_id": "other-bot",
+      "expect": {
+        "allowed": true,
+        "effect": "allow",
+        "reversibility": "compensable",
+        "rule_id": "safe-enough"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk"
+      ],
+      "threat_score": 0,
+      "tool": "invoices.pay"
+    },
+    {
+      "action": "write",
+      "agent_id": "other-bot",
+      "expect": {
+        "allowed": true,
+        "effect": "allow",
+        "reversibility": "compensable",
+        "rule_id": "safe-enough"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk",
+        "approver"
+      ],
+      "threat_score": 0,
+      "tool": "invoices.pay"
+    },
+    {
+      "action": "admin",
+      "agent_id": "ap-bot",
+      "expect": {
+        "allowed": true,
+        "effect": "allow",
+        "reversibility": "compensable",
+        "rule_id": "safe-enough"
+      },
+      "risk": 0,
+      "roles": [],
+      "threat_score": 0,
+      "tool": "invoices.pay"
+    },
+    {
+      "action": "admin",
+      "agent_id": "ap-bot",
+      "expect": {
+        "allowed": true,
+        "effect": "allow",
+        "reversibility": "compensable",
+        "rule_id": "safe-enough"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk"
+      ],
+      "threat_score": 0,
+      "tool": "invoices.pay"
+    },
+    {
+      "action": "admin",
+      "agent_id": "ap-bot",
+      "expect": {
+        "allowed": true,
+        "effect": "allow",
+        "reversibility": "compensable",
+        "rule_id": "safe-enough"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk",
+        "approver"
+      ],
+      "threat_score": 0,
+      "tool": "invoices.pay"
+    },
+    {
+      "action": "admin",
+      "agent_id": "other-bot",
+      "expect": {
+        "allowed": true,
+        "effect": "allow",
+        "reversibility": "compensable",
+        "rule_id": "safe-enough"
+      },
+      "risk": 0,
+      "roles": [],
+      "threat_score": 0,
+      "tool": "invoices.pay"
+    },
+    {
+      "action": "admin",
+      "agent_id": "other-bot",
+      "expect": {
+        "allowed": true,
+        "effect": "allow",
+        "reversibility": "compensable",
+        "rule_id": "safe-enough"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk"
+      ],
+      "threat_score": 0,
+      "tool": "invoices.pay"
+    },
+    {
+      "action": "admin",
+      "agent_id": "other-bot",
+      "expect": {
+        "allowed": true,
+        "effect": "allow",
+        "reversibility": "compensable",
+        "rule_id": "safe-enough"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk",
+        "approver"
+      ],
+      "threat_score": 0,
+      "tool": "invoices.pay"
+    },
+    {
+      "action": "read",
+      "agent_id": "ap-bot",
+      "expect": {
+        "allowed": true,
+        "effect": "allow",
+        "reversibility": "reversible",
+        "rule_id": "safe-enough"
+      },
+      "risk": 0,
+      "roles": [],
+      "threat_score": 0,
+      "tool": "vendors.update"
+    },
+    {
+      "action": "read",
+      "agent_id": "ap-bot",
+      "expect": {
+        "allowed": true,
+        "effect": "allow",
+        "reversibility": "reversible",
+        "rule_id": "safe-enough"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk"
+      ],
+      "threat_score": 0,
+      "tool": "vendors.update"
+    },
+    {
+      "action": "read",
+      "agent_id": "ap-bot",
+      "expect": {
+        "allowed": true,
+        "effect": "allow",
+        "reversibility": "reversible",
+        "rule_id": "safe-enough"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk",
+        "approver"
+      ],
+      "threat_score": 0,
+      "tool": "vendors.update"
+    },
+    {
+      "action": "read",
+      "agent_id": "other-bot",
+      "expect": {
+        "allowed": true,
+        "effect": "allow",
+        "reversibility": "reversible",
+        "rule_id": "safe-enough"
+      },
+      "risk": 0,
+      "roles": [],
+      "threat_score": 0,
+      "tool": "vendors.update"
+    },
+    {
+      "action": "read",
+      "agent_id": "other-bot",
+      "expect": {
+        "allowed": true,
+        "effect": "allow",
+        "reversibility": "reversible",
+        "rule_id": "safe-enough"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk"
+      ],
+      "threat_score": 0,
+      "tool": "vendors.update"
+    },
+    {
+      "action": "read",
+      "agent_id": "other-bot",
+      "expect": {
+        "allowed": true,
+        "effect": "allow",
+        "reversibility": "reversible",
+        "rule_id": "safe-enough"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk",
+        "approver"
+      ],
+      "threat_score": 0,
+      "tool": "vendors.update"
+    },
+    {
+      "action": "write",
+      "agent_id": "ap-bot",
+      "expect": {
+        "allowed": true,
+        "effect": "allow",
+        "reversibility": "reversible",
+        "rule_id": "safe-enough"
+      },
+      "risk": 0,
+      "roles": [],
+      "threat_score": 0,
+      "tool": "vendors.update"
+    },
+    {
+      "action": "write",
+      "agent_id": "ap-bot",
+      "expect": {
+        "allowed": true,
+        "effect": "allow",
+        "reversibility": "reversible",
+        "rule_id": "safe-enough"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk"
+      ],
+      "threat_score": 0,
+      "tool": "vendors.update"
+    },
+    {
+      "action": "write",
+      "agent_id": "ap-bot",
+      "expect": {
+        "allowed": true,
+        "effect": "allow",
+        "reversibility": "reversible",
+        "rule_id": "safe-enough"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk",
+        "approver"
+      ],
+      "threat_score": 0,
+      "tool": "vendors.update"
+    },
+    {
+      "action": "write",
+      "agent_id": "other-bot",
+      "expect": {
+        "allowed": true,
+        "effect": "allow",
+        "reversibility": "reversible",
+        "rule_id": "safe-enough"
+      },
+      "risk": 0,
+      "roles": [],
+      "threat_score": 0,
+      "tool": "vendors.update"
+    },
+    {
+      "action": "write",
+      "agent_id": "other-bot",
+      "expect": {
+        "allowed": true,
+        "effect": "allow",
+        "reversibility": "reversible",
+        "rule_id": "safe-enough"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk"
+      ],
+      "threat_score": 0,
+      "tool": "vendors.update"
+    },
+    {
+      "action": "write",
+      "agent_id": "other-bot",
+      "expect": {
+        "allowed": true,
+        "effect": "allow",
+        "reversibility": "reversible",
+        "rule_id": "safe-enough"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk",
+        "approver"
+      ],
+      "threat_score": 0,
+      "tool": "vendors.update"
+    },
+    {
+      "action": "admin",
+      "agent_id": "ap-bot",
+      "expect": {
+        "allowed": true,
+        "effect": "allow",
+        "reversibility": "reversible",
+        "rule_id": "safe-enough"
+      },
+      "risk": 0,
+      "roles": [],
+      "threat_score": 0,
+      "tool": "vendors.update"
+    },
+    {
+      "action": "admin",
+      "agent_id": "ap-bot",
+      "expect": {
+        "allowed": true,
+        "effect": "allow",
+        "reversibility": "reversible",
+        "rule_id": "safe-enough"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk"
+      ],
+      "threat_score": 0,
+      "tool": "vendors.update"
+    },
+    {
+      "action": "admin",
+      "agent_id": "ap-bot",
+      "expect": {
+        "allowed": true,
+        "effect": "allow",
+        "reversibility": "reversible",
+        "rule_id": "safe-enough"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk",
+        "approver"
+      ],
+      "threat_score": 0,
+      "tool": "vendors.update"
+    },
+    {
+      "action": "admin",
+      "agent_id": "other-bot",
+      "expect": {
+        "allowed": true,
+        "effect": "allow",
+        "reversibility": "reversible",
+        "rule_id": "safe-enough"
+      },
+      "risk": 0,
+      "roles": [],
+      "threat_score": 0,
+      "tool": "vendors.update"
+    },
+    {
+      "action": "admin",
+      "agent_id": "other-bot",
+      "expect": {
+        "allowed": true,
+        "effect": "allow",
+        "reversibility": "reversible",
+        "rule_id": "safe-enough"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk"
+      ],
+      "threat_score": 0,
+      "tool": "vendors.update"
+    },
+    {
+      "action": "admin",
+      "agent_id": "other-bot",
+      "expect": {
+        "allowed": true,
+        "effect": "allow",
+        "reversibility": "reversible",
+        "rule_id": "safe-enough"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk",
+        "approver"
+      ],
+      "threat_score": 0,
+      "tool": "vendors.update"
+    },
+    {
+      "action": "read",
+      "agent_id": "ap-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "irreversible",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [],
+      "threat_score": 0,
+      "tool": "payments.wire"
+    },
+    {
+      "action": "read",
+      "agent_id": "ap-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "irreversible",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk"
+      ],
+      "threat_score": 0,
+      "tool": "payments.wire"
+    },
+    {
+      "action": "read",
+      "agent_id": "ap-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "irreversible",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk",
+        "approver"
+      ],
+      "threat_score": 0,
+      "tool": "payments.wire"
+    },
+    {
+      "action": "read",
+      "agent_id": "other-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "irreversible",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [],
+      "threat_score": 0,
+      "tool": "payments.wire"
+    },
+    {
+      "action": "read",
+      "agent_id": "other-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "irreversible",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk"
+      ],
+      "threat_score": 0,
+      "tool": "payments.wire"
+    },
+    {
+      "action": "read",
+      "agent_id": "other-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "irreversible",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk",
+        "approver"
+      ],
+      "threat_score": 0,
+      "tool": "payments.wire"
+    },
+    {
+      "action": "write",
+      "agent_id": "ap-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "irreversible",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [],
+      "threat_score": 0,
+      "tool": "payments.wire"
+    },
+    {
+      "action": "write",
+      "agent_id": "ap-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "irreversible",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk"
+      ],
+      "threat_score": 0,
+      "tool": "payments.wire"
+    },
+    {
+      "action": "write",
+      "agent_id": "ap-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "irreversible",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk",
+        "approver"
+      ],
+      "threat_score": 0,
+      "tool": "payments.wire"
+    },
+    {
+      "action": "write",
+      "agent_id": "other-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "irreversible",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [],
+      "threat_score": 0,
+      "tool": "payments.wire"
+    },
+    {
+      "action": "write",
+      "agent_id": "other-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "irreversible",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk"
+      ],
+      "threat_score": 0,
+      "tool": "payments.wire"
+    },
+    {
+      "action": "write",
+      "agent_id": "other-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "irreversible",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk",
+        "approver"
+      ],
+      "threat_score": 0,
+      "tool": "payments.wire"
+    },
+    {
+      "action": "admin",
+      "agent_id": "ap-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "irreversible",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [],
+      "threat_score": 0,
+      "tool": "payments.wire"
+    },
+    {
+      "action": "admin",
+      "agent_id": "ap-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "irreversible",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk"
+      ],
+      "threat_score": 0,
+      "tool": "payments.wire"
+    },
+    {
+      "action": "admin",
+      "agent_id": "ap-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "irreversible",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk",
+        "approver"
+      ],
+      "threat_score": 0,
+      "tool": "payments.wire"
+    },
+    {
+      "action": "admin",
+      "agent_id": "other-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "irreversible",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [],
+      "threat_score": 0,
+      "tool": "payments.wire"
+    },
+    {
+      "action": "admin",
+      "agent_id": "other-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "irreversible",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk"
+      ],
+      "threat_score": 0,
+      "tool": "payments.wire"
+    },
+    {
+      "action": "admin",
+      "agent_id": "other-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "irreversible",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk",
+        "approver"
+      ],
+      "threat_score": 0,
+      "tool": "payments.wire"
+    },
+    {
+      "action": "read",
+      "agent_id": "ap-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [],
+      "threat_score": 0,
+      "tool": "unregistered.tool"
+    },
+    {
+      "action": "read",
+      "agent_id": "ap-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk"
+      ],
+      "threat_score": 0,
+      "tool": "unregistered.tool"
+    },
+    {
+      "action": "read",
+      "agent_id": "ap-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk",
+        "approver"
+      ],
+      "threat_score": 0,
+      "tool": "unregistered.tool"
+    },
+    {
+      "action": "read",
+      "agent_id": "other-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [],
+      "threat_score": 0,
+      "tool": "unregistered.tool"
+    },
+    {
+      "action": "read",
+      "agent_id": "other-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk"
+      ],
+      "threat_score": 0,
+      "tool": "unregistered.tool"
+    },
+    {
+      "action": "read",
+      "agent_id": "other-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk",
+        "approver"
+      ],
+      "threat_score": 0,
+      "tool": "unregistered.tool"
+    },
+    {
+      "action": "write",
+      "agent_id": "ap-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [],
+      "threat_score": 0,
+      "tool": "unregistered.tool"
+    },
+    {
+      "action": "write",
+      "agent_id": "ap-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk"
+      ],
+      "threat_score": 0,
+      "tool": "unregistered.tool"
+    },
+    {
+      "action": "write",
+      "agent_id": "ap-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk",
+        "approver"
+      ],
+      "threat_score": 0,
+      "tool": "unregistered.tool"
+    },
+    {
+      "action": "write",
+      "agent_id": "other-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [],
+      "threat_score": 0,
+      "tool": "unregistered.tool"
+    },
+    {
+      "action": "write",
+      "agent_id": "other-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk"
+      ],
+      "threat_score": 0,
+      "tool": "unregistered.tool"
+    },
+    {
+      "action": "write",
+      "agent_id": "other-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk",
+        "approver"
+      ],
+      "threat_score": 0,
+      "tool": "unregistered.tool"
+    },
+    {
+      "action": "admin",
+      "agent_id": "ap-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [],
+      "threat_score": 0,
+      "tool": "unregistered.tool"
+    },
+    {
+      "action": "admin",
+      "agent_id": "ap-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk"
+      ],
+      "threat_score": 0,
+      "tool": "unregistered.tool"
+    },
+    {
+      "action": "admin",
+      "agent_id": "ap-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk",
+        "approver"
+      ],
+      "threat_score": 0,
+      "tool": "unregistered.tool"
+    },
+    {
+      "action": "admin",
+      "agent_id": "other-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [],
+      "threat_score": 0,
+      "tool": "unregistered.tool"
+    },
+    {
+      "action": "admin",
+      "agent_id": "other-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk"
+      ],
+      "threat_score": 0,
+      "tool": "unregistered.tool"
+    },
+    {
+      "action": "admin",
+      "agent_id": "other-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk",
+        "approver"
+      ],
+      "threat_score": 0,
+      "tool": "unregistered.tool"
+    },
+    {
+      "action": "read",
+      "agent_id": "ap-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [],
+      "threat_score": 0,
+      "tool": "invoices"
+    },
+    {
+      "action": "read",
+      "agent_id": "ap-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk"
+      ],
+      "threat_score": 0,
+      "tool": "invoices"
+    },
+    {
+      "action": "read",
+      "agent_id": "ap-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk",
+        "approver"
+      ],
+      "threat_score": 0,
+      "tool": "invoices"
+    },
+    {
+      "action": "read",
+      "agent_id": "other-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [],
+      "threat_score": 0,
+      "tool": "invoices"
+    },
+    {
+      "action": "read",
+      "agent_id": "other-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk"
+      ],
+      "threat_score": 0,
+      "tool": "invoices"
+    },
+    {
+      "action": "read",
+      "agent_id": "other-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk",
+        "approver"
+      ],
+      "threat_score": 0,
+      "tool": "invoices"
+    },
+    {
+      "action": "write",
+      "agent_id": "ap-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [],
+      "threat_score": 0,
+      "tool": "invoices"
+    },
+    {
+      "action": "write",
+      "agent_id": "ap-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk"
+      ],
+      "threat_score": 0,
+      "tool": "invoices"
+    },
+    {
+      "action": "write",
+      "agent_id": "ap-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk",
+        "approver"
+      ],
+      "threat_score": 0,
+      "tool": "invoices"
+    },
+    {
+      "action": "write",
+      "agent_id": "other-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [],
+      "threat_score": 0,
+      "tool": "invoices"
+    },
+    {
+      "action": "write",
+      "agent_id": "other-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk"
+      ],
+      "threat_score": 0,
+      "tool": "invoices"
+    },
+    {
+      "action": "write",
+      "agent_id": "other-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk",
+        "approver"
+      ],
+      "threat_score": 0,
+      "tool": "invoices"
+    },
+    {
+      "action": "admin",
+      "agent_id": "ap-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [],
+      "threat_score": 0,
+      "tool": "invoices"
+    },
+    {
+      "action": "admin",
+      "agent_id": "ap-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk"
+      ],
+      "threat_score": 0,
+      "tool": "invoices"
+    },
+    {
+      "action": "admin",
+      "agent_id": "ap-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk",
+        "approver"
+      ],
+      "threat_score": 0,
+      "tool": "invoices"
+    },
+    {
+      "action": "admin",
+      "agent_id": "other-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [],
+      "threat_score": 0,
+      "tool": "invoices"
+    },
+    {
+      "action": "admin",
+      "agent_id": "other-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk"
+      ],
+      "threat_score": 0,
+      "tool": "invoices"
+    },
+    {
+      "action": "admin",
+      "agent_id": "other-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk",
+        "approver"
+      ],
+      "threat_score": 0,
+      "tool": "invoices"
+    },
+    {
+      "action": "read",
+      "agent_id": "ap-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [],
+      "threat_score": 0,
+      "tool": "invoices.read.extra"
+    },
+    {
+      "action": "read",
+      "agent_id": "ap-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk"
+      ],
+      "threat_score": 0,
+      "tool": "invoices.read.extra"
+    },
+    {
+      "action": "read",
+      "agent_id": "ap-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk",
+        "approver"
+      ],
+      "threat_score": 0,
+      "tool": "invoices.read.extra"
+    },
+    {
+      "action": "read",
+      "agent_id": "other-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [],
+      "threat_score": 0,
+      "tool": "invoices.read.extra"
+    },
+    {
+      "action": "read",
+      "agent_id": "other-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk"
+      ],
+      "threat_score": 0,
+      "tool": "invoices.read.extra"
+    },
+    {
+      "action": "read",
+      "agent_id": "other-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk",
+        "approver"
+      ],
+      "threat_score": 0,
+      "tool": "invoices.read.extra"
+    },
+    {
+      "action": "write",
+      "agent_id": "ap-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [],
+      "threat_score": 0,
+      "tool": "invoices.read.extra"
+    },
+    {
+      "action": "write",
+      "agent_id": "ap-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk"
+      ],
+      "threat_score": 0,
+      "tool": "invoices.read.extra"
+    },
+    {
+      "action": "write",
+      "agent_id": "ap-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk",
+        "approver"
+      ],
+      "threat_score": 0,
+      "tool": "invoices.read.extra"
+    },
+    {
+      "action": "write",
+      "agent_id": "other-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [],
+      "threat_score": 0,
+      "tool": "invoices.read.extra"
+    },
+    {
+      "action": "write",
+      "agent_id": "other-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk"
+      ],
+      "threat_score": 0,
+      "tool": "invoices.read.extra"
+    },
+    {
+      "action": "write",
+      "agent_id": "other-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk",
+        "approver"
+      ],
+      "threat_score": 0,
+      "tool": "invoices.read.extra"
+    },
+    {
+      "action": "admin",
+      "agent_id": "ap-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [],
+      "threat_score": 0,
+      "tool": "invoices.read.extra"
+    },
+    {
+      "action": "admin",
+      "agent_id": "ap-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk"
+      ],
+      "threat_score": 0,
+      "tool": "invoices.read.extra"
+    },
+    {
+      "action": "admin",
+      "agent_id": "ap-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk",
+        "approver"
+      ],
+      "threat_score": 0,
+      "tool": "invoices.read.extra"
+    },
+    {
+      "action": "admin",
+      "agent_id": "other-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [],
+      "threat_score": 0,
+      "tool": "invoices.read.extra"
+    },
+    {
+      "action": "admin",
+      "agent_id": "other-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk"
+      ],
+      "threat_score": 0,
+      "tool": "invoices.read.extra"
+    },
+    {
+      "action": "admin",
+      "agent_id": "other-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk",
+        "approver"
+      ],
+      "threat_score": 0,
+      "tool": "invoices.read.extra"
+    },
+    {
+      "action": "read",
+      "agent_id": "ap-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [],
+      "threat_score": 0,
+      "tool": "a/b"
+    },
+    {
+      "action": "read",
+      "agent_id": "ap-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk"
+      ],
+      "threat_score": 0,
+      "tool": "a/b"
+    },
+    {
+      "action": "read",
+      "agent_id": "ap-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk",
+        "approver"
+      ],
+      "threat_score": 0,
+      "tool": "a/b"
+    },
+    {
+      "action": "read",
+      "agent_id": "other-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [],
+      "threat_score": 0,
+      "tool": "a/b"
+    },
+    {
+      "action": "read",
+      "agent_id": "other-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk"
+      ],
+      "threat_score": 0,
+      "tool": "a/b"
+    },
+    {
+      "action": "read",
+      "agent_id": "other-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk",
+        "approver"
+      ],
+      "threat_score": 0,
+      "tool": "a/b"
+    },
+    {
+      "action": "write",
+      "agent_id": "ap-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [],
+      "threat_score": 0,
+      "tool": "a/b"
+    },
+    {
+      "action": "write",
+      "agent_id": "ap-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk"
+      ],
+      "threat_score": 0,
+      "tool": "a/b"
+    },
+    {
+      "action": "write",
+      "agent_id": "ap-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk",
+        "approver"
+      ],
+      "threat_score": 0,
+      "tool": "a/b"
+    },
+    {
+      "action": "write",
+      "agent_id": "other-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [],
+      "threat_score": 0,
+      "tool": "a/b"
+    },
+    {
+      "action": "write",
+      "agent_id": "other-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk"
+      ],
+      "threat_score": 0,
+      "tool": "a/b"
+    },
+    {
+      "action": "write",
+      "agent_id": "other-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk",
+        "approver"
+      ],
+      "threat_score": 0,
+      "tool": "a/b"
+    },
+    {
+      "action": "admin",
+      "agent_id": "ap-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [],
+      "threat_score": 0,
+      "tool": "a/b"
+    },
+    {
+      "action": "admin",
+      "agent_id": "ap-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk"
+      ],
+      "threat_score": 0,
+      "tool": "a/b"
+    },
+    {
+      "action": "admin",
+      "agent_id": "ap-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk",
+        "approver"
+      ],
+      "threat_score": 0,
+      "tool": "a/b"
+    },
+    {
+      "action": "admin",
+      "agent_id": "other-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [],
+      "threat_score": 0,
+      "tool": "a/b"
+    },
+    {
+      "action": "admin",
+      "agent_id": "other-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk"
+      ],
+      "threat_score": 0,
+      "tool": "a/b"
+    },
+    {
+      "action": "admin",
+      "agent_id": "other-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk",
+        "approver"
+      ],
+      "threat_score": 0,
+      "tool": "a/b"
+    },
+    {
+      "action": "read",
+      "agent_id": "ap-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [],
+      "threat_score": 0,
+      "tool": "a.b"
+    },
+    {
+      "action": "read",
+      "agent_id": "ap-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk"
+      ],
+      "threat_score": 0,
+      "tool": "a.b"
+    },
+    {
+      "action": "read",
+      "agent_id": "ap-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk",
+        "approver"
+      ],
+      "threat_score": 0,
+      "tool": "a.b"
+    },
+    {
+      "action": "read",
+      "agent_id": "other-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [],
+      "threat_score": 0,
+      "tool": "a.b"
+    },
+    {
+      "action": "read",
+      "agent_id": "other-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk"
+      ],
+      "threat_score": 0,
+      "tool": "a.b"
+    },
+    {
+      "action": "read",
+      "agent_id": "other-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk",
+        "approver"
+      ],
+      "threat_score": 0,
+      "tool": "a.b"
+    },
+    {
+      "action": "write",
+      "agent_id": "ap-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [],
+      "threat_score": 0,
+      "tool": "a.b"
+    },
+    {
+      "action": "write",
+      "agent_id": "ap-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk"
+      ],
+      "threat_score": 0,
+      "tool": "a.b"
+    },
+    {
+      "action": "write",
+      "agent_id": "ap-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk",
+        "approver"
+      ],
+      "threat_score": 0,
+      "tool": "a.b"
+    },
+    {
+      "action": "write",
+      "agent_id": "other-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [],
+      "threat_score": 0,
+      "tool": "a.b"
+    },
+    {
+      "action": "write",
+      "agent_id": "other-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk"
+      ],
+      "threat_score": 0,
+      "tool": "a.b"
+    },
+    {
+      "action": "write",
+      "agent_id": "other-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk",
+        "approver"
+      ],
+      "threat_score": 0,
+      "tool": "a.b"
+    },
+    {
+      "action": "admin",
+      "agent_id": "ap-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [],
+      "threat_score": 0,
+      "tool": "a.b"
+    },
+    {
+      "action": "admin",
+      "agent_id": "ap-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk"
+      ],
+      "threat_score": 0,
+      "tool": "a.b"
+    },
+    {
+      "action": "admin",
+      "agent_id": "ap-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk",
+        "approver"
+      ],
+      "threat_score": 0,
+      "tool": "a.b"
+    },
+    {
+      "action": "admin",
+      "agent_id": "other-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [],
+      "threat_score": 0,
+      "tool": "a.b"
+    },
+    {
+      "action": "admin",
+      "agent_id": "other-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk"
+      ],
+      "threat_score": 0,
+      "tool": "a.b"
+    },
+    {
+      "action": "admin",
+      "agent_id": "other-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk",
+        "approver"
+      ],
+      "threat_score": 0,
+      "tool": "a.b"
+    },
+    {
+      "action": "read",
+      "agent_id": "ap-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [],
+      "threat_score": 0,
+      "tool": "file[1]"
+    },
+    {
+      "action": "read",
+      "agent_id": "ap-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk"
+      ],
+      "threat_score": 0,
+      "tool": "file[1]"
+    },
+    {
+      "action": "read",
+      "agent_id": "ap-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk",
+        "approver"
+      ],
+      "threat_score": 0,
+      "tool": "file[1]"
+    },
+    {
+      "action": "read",
+      "agent_id": "other-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [],
+      "threat_score": 0,
+      "tool": "file[1]"
+    },
+    {
+      "action": "read",
+      "agent_id": "other-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk"
+      ],
+      "threat_score": 0,
+      "tool": "file[1]"
+    },
+    {
+      "action": "read",
+      "agent_id": "other-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk",
+        "approver"
+      ],
+      "threat_score": 0,
+      "tool": "file[1]"
+    },
+    {
+      "action": "write",
+      "agent_id": "ap-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [],
+      "threat_score": 0,
+      "tool": "file[1]"
+    },
+    {
+      "action": "write",
+      "agent_id": "ap-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk"
+      ],
+      "threat_score": 0,
+      "tool": "file[1]"
+    },
+    {
+      "action": "write",
+      "agent_id": "ap-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk",
+        "approver"
+      ],
+      "threat_score": 0,
+      "tool": "file[1]"
+    },
+    {
+      "action": "write",
+      "agent_id": "other-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [],
+      "threat_score": 0,
+      "tool": "file[1]"
+    },
+    {
+      "action": "write",
+      "agent_id": "other-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk"
+      ],
+      "threat_score": 0,
+      "tool": "file[1]"
+    },
+    {
+      "action": "write",
+      "agent_id": "other-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk",
+        "approver"
+      ],
+      "threat_score": 0,
+      "tool": "file[1]"
+    },
+    {
+      "action": "admin",
+      "agent_id": "ap-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [],
+      "threat_score": 0,
+      "tool": "file[1]"
+    },
+    {
+      "action": "admin",
+      "agent_id": "ap-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk"
+      ],
+      "threat_score": 0,
+      "tool": "file[1]"
+    },
+    {
+      "action": "admin",
+      "agent_id": "ap-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk",
+        "approver"
+      ],
+      "threat_score": 0,
+      "tool": "file[1]"
+    },
+    {
+      "action": "admin",
+      "agent_id": "other-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [],
+      "threat_score": 0,
+      "tool": "file[1]"
+    },
+    {
+      "action": "admin",
+      "agent_id": "other-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk"
+      ],
+      "threat_score": 0,
+      "tool": "file[1]"
+    },
+    {
+      "action": "admin",
+      "agent_id": "other-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk",
+        "approver"
+      ],
+      "threat_score": 0,
+      "tool": "file[1]"
+    },
+    {
+      "action": "read",
+      "agent_id": "ap-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [],
+      "threat_score": 0,
+      "tool": "UPPER.case"
+    },
+    {
+      "action": "read",
+      "agent_id": "ap-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk"
+      ],
+      "threat_score": 0,
+      "tool": "UPPER.case"
+    },
+    {
+      "action": "read",
+      "agent_id": "ap-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk",
+        "approver"
+      ],
+      "threat_score": 0,
+      "tool": "UPPER.case"
+    },
+    {
+      "action": "read",
+      "agent_id": "other-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [],
+      "threat_score": 0,
+      "tool": "UPPER.case"
+    },
+    {
+      "action": "read",
+      "agent_id": "other-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk"
+      ],
+      "threat_score": 0,
+      "tool": "UPPER.case"
+    },
+    {
+      "action": "read",
+      "agent_id": "other-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk",
+        "approver"
+      ],
+      "threat_score": 0,
+      "tool": "UPPER.case"
+    },
+    {
+      "action": "write",
+      "agent_id": "ap-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [],
+      "threat_score": 0,
+      "tool": "UPPER.case"
+    },
+    {
+      "action": "write",
+      "agent_id": "ap-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk"
+      ],
+      "threat_score": 0,
+      "tool": "UPPER.case"
+    },
+    {
+      "action": "write",
+      "agent_id": "ap-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk",
+        "approver"
+      ],
+      "threat_score": 0,
+      "tool": "UPPER.case"
+    },
+    {
+      "action": "write",
+      "agent_id": "other-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [],
+      "threat_score": 0,
+      "tool": "UPPER.case"
+    },
+    {
+      "action": "write",
+      "agent_id": "other-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk"
+      ],
+      "threat_score": 0,
+      "tool": "UPPER.case"
+    },
+    {
+      "action": "write",
+      "agent_id": "other-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk",
+        "approver"
+      ],
+      "threat_score": 0,
+      "tool": "UPPER.case"
+    },
+    {
+      "action": "admin",
+      "agent_id": "ap-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [],
+      "threat_score": 0,
+      "tool": "UPPER.case"
+    },
+    {
+      "action": "admin",
+      "agent_id": "ap-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk"
+      ],
+      "threat_score": 0,
+      "tool": "UPPER.case"
+    },
+    {
+      "action": "admin",
+      "agent_id": "ap-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk",
+        "approver"
+      ],
+      "threat_score": 0,
+      "tool": "UPPER.case"
+    },
+    {
+      "action": "admin",
+      "agent_id": "other-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [],
+      "threat_score": 0,
+      "tool": "UPPER.case"
+    },
+    {
+      "action": "admin",
+      "agent_id": "other-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk"
+      ],
+      "threat_score": 0,
+      "tool": "UPPER.case"
+    },
+    {
+      "action": "admin",
+      "agent_id": "other-bot",
+      "expect": {
+        "allowed": false,
+        "effect": "deny",
+        "reversibility": "unknown",
+        "rule_id": "__default__"
+      },
+      "risk": 0,
+      "roles": [
+        "ap-clerk",
+        "approver"
+      ],
+      "threat_score": 0,
+      "tool": "UPPER.case"
+    }
+  ],
+  "name": "floor-only"
+}
