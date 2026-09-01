@@ -46,6 +46,18 @@ Reversibility isn't a recovery procedure you write afterwards — by then the pr
   reason: "No rollback path exists, so a person must own this decision."
 ```
 
+That rule names an exact set, which is right when the set *is* the classification — `[irreversible, unknown]` is precisely "nothing can take this back". An **allow** rule wants a floor instead:
+
+```yaml
+- id: undoable-writes
+  effect: allow
+  min_reversibility: compensable
+```
+
+Postures rank `unknown < irreversible < compensable < reversible < idempotent`, so that admits anything at least as recoverable as compensable, and keeps admitting whatever safer posture is added later. A rule states a set or a floor, never both.
+
+Listing postures by name in an allow rule is how a newly added one silently stops matching and falls through to the default effect. That has already happened here once: adding `idempotent` — an action that changes nothing, so there is nothing to undo — briefly left reads denied while a low-risk irreversible call was still permitted.
+
 Enforcement stops being only *"may this agent do it?"* and becomes also *"and can we take it back if it was wrong?"*
 
 ---
