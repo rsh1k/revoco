@@ -687,8 +687,13 @@ class RecoverabilityRegister:
             e for e in entries
             if e.last and e.last.outcome.is_proof and not e.is_proven(now=now)
         ]
+        # The `is not None` is redundant at runtime — `alarming` already filtered on
+        # it — and not redundant to a type checker, which cannot carry that narrowing
+        # across the comprehension boundary.
         by_urgency = Counter(
-            _ALARM_URGENCY.get(e.last.outcome, "failing") for e in alarming
+            _ALARM_URGENCY.get(e.last.outcome, "failing")
+            for e in alarming
+            if e.last is not None
         )
         return {
             "stale_after_seconds": self.stale_after,
