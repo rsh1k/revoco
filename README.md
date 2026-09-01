@@ -242,7 +242,7 @@ ever runs. Exit code is non-zero, so it gates a deploy.
 This is decidable because the rule language is small — finite set membership,
 globs over three fields, and comparisons against finitely many thresholds. The
 integers only ever meet the thresholds the policy names, so boundary values
-suffice; reversibility has four values; the string fields are partitioned into
+suffice; reversibility has five values; the string fields are partitioned into
 equivalence classes by the policy's own patterns. Enumerating one witness per
 class answers the question exactly, with no SAT solver and no approximation.
 
@@ -407,7 +407,7 @@ Early. What works today:
 - `inventory`, `suggest`, `simulate`, `depends`, `exposure` over recorded traffic
 - `intel` behavioural findings mapped to MITRE ATLAS; `finality` for on-chain work
 - `prove` static analysis: unreachable rules and holes, with concrete witnesses
-- 3,960 frozen verdicts matched by both runtimes; 9 of 9 mutations caught
+- 4,158 frozen verdicts matched by both runtimes; 11 of 11 mutations caught
 
 Not built yet: drills, containment, SPIFFE identity, OTel emission. The reversal
 engine and delegation chain live in [revoco](https://github.com/rsh1k/revoco) and

@@ -6,7 +6,7 @@
       "email.send": "irreversible",
       "invoices.approve": "reversible",
       "invoices.pay": "compensable",
-      "invoices.read": "reversible",
+      "invoices.read": "idempotent",
       "payments.wire": "irreversible",
       "vendors.create": "compensable",
       "vendors.update": "reversible"
@@ -23,6 +23,7 @@
         "effect": "allow",
         "id": "clerk-invoices",
         "max_risk": 40,
+        "min_reversibility": null,
         "min_risk": null,
         "min_threat_score": null,
         "reason": "matched rule clerk-invoices",
@@ -45,6 +46,7 @@
         "effect": "deny",
         "id": "threat-block",
         "max_risk": null,
+        "min_reversibility": null,
         "min_risk": null,
         "min_threat_score": 5,
         "reason": "matched rule threat-block",
@@ -65,6 +67,7 @@
         "effect": "allow",
         "id": "named-agent",
         "max_risk": null,
+        "min_reversibility": null,
         "min_risk": null,
         "min_threat_score": null,
         "reason": "matched rule named-agent",
@@ -76,7 +79,7 @@
         ]
       }
     ],
-    "schema": 1,
+    "schema": 2,
     "unknown_tool_reversibility": "unknown"
   },
   "cases": [
@@ -86,7 +89,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "named-agent"
       },
       "risk": 0,
@@ -100,7 +103,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "named-agent"
       },
       "risk": 0,
@@ -114,7 +117,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "threat-block"
       },
       "risk": 0,
@@ -128,7 +131,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "threat-block"
       },
       "risk": 0,
@@ -142,7 +145,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "named-agent"
       },
       "risk": 39,
@@ -156,7 +159,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "named-agent"
       },
       "risk": 39,
@@ -170,7 +173,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "threat-block"
       },
       "risk": 39,
@@ -184,7 +187,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "threat-block"
       },
       "risk": 39,
@@ -198,7 +201,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "named-agent"
       },
       "risk": 40,
@@ -212,7 +215,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "named-agent"
       },
       "risk": 40,
@@ -226,7 +229,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "threat-block"
       },
       "risk": 40,
@@ -240,7 +243,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "threat-block"
       },
       "risk": 40,
@@ -254,7 +257,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "named-agent"
       },
       "risk": 41,
@@ -268,7 +271,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "named-agent"
       },
       "risk": 41,
@@ -282,7 +285,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "threat-block"
       },
       "risk": 41,
@@ -296,7 +299,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "threat-block"
       },
       "risk": 41,
@@ -310,7 +313,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 0,
@@ -326,7 +329,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 0,
@@ -342,7 +345,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 0,
@@ -358,7 +361,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 0,
@@ -374,7 +377,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 39,
@@ -390,7 +393,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 39,
@@ -406,7 +409,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 39,
@@ -422,7 +425,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 39,
@@ -438,7 +441,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 40,
@@ -454,7 +457,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 40,
@@ -470,7 +473,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 40,
@@ -486,7 +489,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 40,
@@ -502,7 +505,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "named-agent"
       },
       "risk": 41,
@@ -518,7 +521,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "named-agent"
       },
       "risk": 41,
@@ -534,7 +537,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "threat-block"
       },
       "risk": 41,
@@ -550,7 +553,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "threat-block"
       },
       "risk": 41,
@@ -566,7 +569,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 0,
@@ -583,7 +586,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 0,
@@ -600,7 +603,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 0,
@@ -617,7 +620,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 0,
@@ -634,7 +637,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 39,
@@ -651,7 +654,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 39,
@@ -668,7 +671,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 39,
@@ -685,7 +688,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 39,
@@ -702,7 +705,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 40,
@@ -719,7 +722,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 40,
@@ -736,7 +739,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 40,
@@ -753,7 +756,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 40,
@@ -770,7 +773,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "named-agent"
       },
       "risk": 41,
@@ -787,7 +790,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "named-agent"
       },
       "risk": 41,
@@ -804,7 +807,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "threat-block"
       },
       "risk": 41,
@@ -821,7 +824,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "threat-block"
       },
       "risk": 41,
@@ -838,7 +841,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "__default__"
       },
       "risk": 0,
@@ -852,7 +855,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "__default__"
       },
       "risk": 0,
@@ -866,7 +869,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "threat-block"
       },
       "risk": 0,
@@ -880,7 +883,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "threat-block"
       },
       "risk": 0,
@@ -894,7 +897,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "__default__"
       },
       "risk": 39,
@@ -908,7 +911,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "__default__"
       },
       "risk": 39,
@@ -922,7 +925,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "threat-block"
       },
       "risk": 39,
@@ -936,7 +939,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "threat-block"
       },
       "risk": 39,
@@ -950,7 +953,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "__default__"
       },
       "risk": 40,
@@ -964,7 +967,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "__default__"
       },
       "risk": 40,
@@ -978,7 +981,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "threat-block"
       },
       "risk": 40,
@@ -992,7 +995,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "threat-block"
       },
       "risk": 40,
@@ -1006,7 +1009,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "__default__"
       },
       "risk": 41,
@@ -1020,7 +1023,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "__default__"
       },
       "risk": 41,
@@ -1034,7 +1037,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "threat-block"
       },
       "risk": 41,
@@ -1048,7 +1051,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "threat-block"
       },
       "risk": 41,
@@ -1062,7 +1065,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 0,
@@ -1078,7 +1081,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 0,
@@ -1094,7 +1097,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 0,
@@ -1110,7 +1113,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 0,
@@ -1126,7 +1129,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 39,
@@ -1142,7 +1145,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 39,
@@ -1158,7 +1161,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 39,
@@ -1174,7 +1177,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 39,
@@ -1190,7 +1193,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 40,
@@ -1206,7 +1209,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 40,
@@ -1222,7 +1225,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 40,
@@ -1238,7 +1241,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 40,
@@ -1254,7 +1257,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "__default__"
       },
       "risk": 41,
@@ -1270,7 +1273,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "__default__"
       },
       "risk": 41,
@@ -1286,7 +1289,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "threat-block"
       },
       "risk": 41,
@@ -1302,7 +1305,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "threat-block"
       },
       "risk": 41,
@@ -1318,7 +1321,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 0,
@@ -1335,7 +1338,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 0,
@@ -1352,7 +1355,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 0,
@@ -1369,7 +1372,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 0,
@@ -1386,7 +1389,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 39,
@@ -1403,7 +1406,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 39,
@@ -1420,7 +1423,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 39,
@@ -1437,7 +1440,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 39,
@@ -1454,7 +1457,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 40,
@@ -1471,7 +1474,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 40,
@@ -1488,7 +1491,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 40,
@@ -1505,7 +1508,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 40,
@@ -1522,7 +1525,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "__default__"
       },
       "risk": 41,
@@ -1539,7 +1542,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "__default__"
       },
       "risk": 41,
@@ -1556,7 +1559,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "threat-block"
       },
       "risk": 41,
@@ -1573,7 +1576,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "threat-block"
       },
       "risk": 41,
@@ -1590,7 +1593,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "__default__"
       },
       "risk": 0,
@@ -1604,7 +1607,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "__default__"
       },
       "risk": 0,
@@ -1618,7 +1621,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "threat-block"
       },
       "risk": 0,
@@ -1632,7 +1635,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "threat-block"
       },
       "risk": 0,
@@ -1646,7 +1649,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "__default__"
       },
       "risk": 39,
@@ -1660,7 +1663,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "__default__"
       },
       "risk": 39,
@@ -1674,7 +1677,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "threat-block"
       },
       "risk": 39,
@@ -1688,7 +1691,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "threat-block"
       },
       "risk": 39,
@@ -1702,7 +1705,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "__default__"
       },
       "risk": 40,
@@ -1716,7 +1719,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "__default__"
       },
       "risk": 40,
@@ -1730,7 +1733,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "threat-block"
       },
       "risk": 40,
@@ -1744,7 +1747,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "threat-block"
       },
       "risk": 40,
@@ -1758,7 +1761,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "__default__"
       },
       "risk": 41,
@@ -1772,7 +1775,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "__default__"
       },
       "risk": 41,
@@ -1786,7 +1789,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "threat-block"
       },
       "risk": 41,
@@ -1800,7 +1803,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "threat-block"
       },
       "risk": 41,
@@ -1814,7 +1817,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 0,
@@ -1830,7 +1833,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 0,
@@ -1846,7 +1849,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 0,
@@ -1862,7 +1865,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 0,
@@ -1878,7 +1881,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 39,
@@ -1894,7 +1897,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 39,
@@ -1910,7 +1913,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 39,
@@ -1926,7 +1929,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 39,
@@ -1942,7 +1945,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 40,
@@ -1958,7 +1961,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 40,
@@ -1974,7 +1977,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 40,
@@ -1990,7 +1993,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 40,
@@ -2006,7 +2009,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "__default__"
       },
       "risk": 41,
@@ -2022,7 +2025,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "__default__"
       },
       "risk": 41,
@@ -2038,7 +2041,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "threat-block"
       },
       "risk": 41,
@@ -2054,7 +2057,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "threat-block"
       },
       "risk": 41,
@@ -2070,7 +2073,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 0,
@@ -2087,7 +2090,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 0,
@@ -2104,7 +2107,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 0,
@@ -2121,7 +2124,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 0,
@@ -2138,7 +2141,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 39,
@@ -2155,7 +2158,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 39,
@@ -2172,7 +2175,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 39,
@@ -2189,7 +2192,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 39,
@@ -2206,7 +2209,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 40,
@@ -2223,7 +2226,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 40,
@@ -2240,7 +2243,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 40,
@@ -2257,7 +2260,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 40,
@@ -2274,7 +2277,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "__default__"
       },
       "risk": 41,
@@ -2291,7 +2294,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "__default__"
       },
       "risk": 41,
@@ -2308,7 +2311,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "threat-block"
       },
       "risk": 41,
@@ -2325,7 +2328,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "threat-block"
       },
       "risk": 41,
@@ -2342,7 +2345,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "__default__"
       },
       "risk": 0,
@@ -2356,7 +2359,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "__default__"
       },
       "risk": 0,
@@ -2370,7 +2373,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "threat-block"
       },
       "risk": 0,
@@ -2384,7 +2387,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "threat-block"
       },
       "risk": 0,
@@ -2398,7 +2401,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "__default__"
       },
       "risk": 39,
@@ -2412,7 +2415,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "__default__"
       },
       "risk": 39,
@@ -2426,7 +2429,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "threat-block"
       },
       "risk": 39,
@@ -2440,7 +2443,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "threat-block"
       },
       "risk": 39,
@@ -2454,7 +2457,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "__default__"
       },
       "risk": 40,
@@ -2468,7 +2471,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "__default__"
       },
       "risk": 40,
@@ -2482,7 +2485,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "threat-block"
       },
       "risk": 40,
@@ -2496,7 +2499,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "threat-block"
       },
       "risk": 40,
@@ -2510,7 +2513,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "__default__"
       },
       "risk": 41,
@@ -2524,7 +2527,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "__default__"
       },
       "risk": 41,
@@ -2538,7 +2541,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "threat-block"
       },
       "risk": 41,
@@ -2552,7 +2555,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "threat-block"
       },
       "risk": 41,
@@ -2566,7 +2569,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 0,
@@ -2582,7 +2585,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 0,
@@ -2598,7 +2601,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 0,
@@ -2614,7 +2617,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 0,
@@ -2630,7 +2633,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 39,
@@ -2646,7 +2649,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 39,
@@ -2662,7 +2665,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 39,
@@ -2678,7 +2681,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 39,
@@ -2694,7 +2697,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 40,
@@ -2710,7 +2713,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 40,
@@ -2726,7 +2729,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 40,
@@ -2742,7 +2745,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 40,
@@ -2758,7 +2761,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "__default__"
       },
       "risk": 41,
@@ -2774,7 +2777,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "__default__"
       },
       "risk": 41,
@@ -2790,7 +2793,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "threat-block"
       },
       "risk": 41,
@@ -2806,7 +2809,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "threat-block"
       },
       "risk": 41,
@@ -2822,7 +2825,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 0,
@@ -2839,7 +2842,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 0,
@@ -2856,7 +2859,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 0,
@@ -2873,7 +2876,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 0,
@@ -2890,7 +2893,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 39,
@@ -2907,7 +2910,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 39,
@@ -2924,7 +2927,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 39,
@@ -2941,7 +2944,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 39,
@@ -2958,7 +2961,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 40,
@@ -2975,7 +2978,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 40,
@@ -2992,7 +2995,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 40,
@@ -3009,7 +3012,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 40,
@@ -3026,7 +3029,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "__default__"
       },
       "risk": 41,
@@ -3043,7 +3046,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "__default__"
       },
       "risk": 41,
@@ -3060,7 +3063,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "threat-block"
       },
       "risk": 41,
@@ -3077,7 +3080,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "threat-block"
       },
       "risk": 41,
@@ -3094,7 +3097,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "__default__"
       },
       "risk": 0,
@@ -3108,7 +3111,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "__default__"
       },
       "risk": 0,
@@ -3122,7 +3125,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "threat-block"
       },
       "risk": 0,
@@ -3136,7 +3139,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "threat-block"
       },
       "risk": 0,
@@ -3150,7 +3153,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "__default__"
       },
       "risk": 39,
@@ -3164,7 +3167,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "__default__"
       },
       "risk": 39,
@@ -3178,7 +3181,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "threat-block"
       },
       "risk": 39,
@@ -3192,7 +3195,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "threat-block"
       },
       "risk": 39,
@@ -3206,7 +3209,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "__default__"
       },
       "risk": 40,
@@ -3220,7 +3223,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "__default__"
       },
       "risk": 40,
@@ -3234,7 +3237,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "threat-block"
       },
       "risk": 40,
@@ -3248,7 +3251,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "threat-block"
       },
       "risk": 40,
@@ -3262,7 +3265,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "__default__"
       },
       "risk": 41,
@@ -3276,7 +3279,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "__default__"
       },
       "risk": 41,
@@ -3290,7 +3293,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "threat-block"
       },
       "risk": 41,
@@ -3304,7 +3307,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "threat-block"
       },
       "risk": 41,
@@ -3318,7 +3321,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 0,
@@ -3334,7 +3337,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 0,
@@ -3350,7 +3353,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 0,
@@ -3366,7 +3369,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 0,
@@ -3382,7 +3385,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 39,
@@ -3398,7 +3401,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 39,
@@ -3414,7 +3417,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 39,
@@ -3430,7 +3433,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 39,
@@ -3446,7 +3449,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 40,
@@ -3462,7 +3465,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 40,
@@ -3478,7 +3481,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 40,
@@ -3494,7 +3497,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 40,
@@ -3510,7 +3513,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "__default__"
       },
       "risk": 41,
@@ -3526,7 +3529,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "__default__"
       },
       "risk": 41,
@@ -3542,7 +3545,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "threat-block"
       },
       "risk": 41,
@@ -3558,7 +3561,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "threat-block"
       },
       "risk": 41,
@@ -3574,7 +3577,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 0,
@@ -3591,7 +3594,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 0,
@@ -3608,7 +3611,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 0,
@@ -3625,7 +3628,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 0,
@@ -3642,7 +3645,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 39,
@@ -3659,7 +3662,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 39,
@@ -3676,7 +3679,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 39,
@@ -3693,7 +3696,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 39,
@@ -3710,7 +3713,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 40,
@@ -3727,7 +3730,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 40,
@@ -3744,7 +3747,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 40,
@@ -3761,7 +3764,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 40,
@@ -3778,7 +3781,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "__default__"
       },
       "risk": 41,
@@ -3795,7 +3798,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "__default__"
       },
       "risk": 41,
@@ -3812,7 +3815,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "threat-block"
       },
       "risk": 41,
@@ -3829,7 +3832,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "threat-block"
       },
       "risk": 41,
@@ -3846,7 +3849,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "__default__"
       },
       "risk": 0,
@@ -3860,7 +3863,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "__default__"
       },
       "risk": 0,
@@ -3874,7 +3877,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "threat-block"
       },
       "risk": 0,
@@ -3888,7 +3891,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "threat-block"
       },
       "risk": 0,
@@ -3902,7 +3905,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "__default__"
       },
       "risk": 39,
@@ -3916,7 +3919,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "__default__"
       },
       "risk": 39,
@@ -3930,7 +3933,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "threat-block"
       },
       "risk": 39,
@@ -3944,7 +3947,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "threat-block"
       },
       "risk": 39,
@@ -3958,7 +3961,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "__default__"
       },
       "risk": 40,
@@ -3972,7 +3975,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "__default__"
       },
       "risk": 40,
@@ -3986,7 +3989,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "threat-block"
       },
       "risk": 40,
@@ -4000,7 +4003,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "threat-block"
       },
       "risk": 40,
@@ -4014,7 +4017,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "__default__"
       },
       "risk": 41,
@@ -4028,7 +4031,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "__default__"
       },
       "risk": 41,
@@ -4042,7 +4045,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "threat-block"
       },
       "risk": 41,
@@ -4056,7 +4059,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "threat-block"
       },
       "risk": 41,
@@ -4070,7 +4073,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 0,
@@ -4086,7 +4089,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 0,
@@ -4102,7 +4105,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 0,
@@ -4118,7 +4121,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 0,
@@ -4134,7 +4137,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 39,
@@ -4150,7 +4153,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 39,
@@ -4166,7 +4169,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 39,
@@ -4182,7 +4185,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 39,
@@ -4198,7 +4201,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 40,
@@ -4214,7 +4217,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 40,
@@ -4230,7 +4233,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 40,
@@ -4246,7 +4249,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 40,
@@ -4262,7 +4265,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "__default__"
       },
       "risk": 41,
@@ -4278,7 +4281,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "__default__"
       },
       "risk": 41,
@@ -4294,7 +4297,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "threat-block"
       },
       "risk": 41,
@@ -4310,7 +4313,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "threat-block"
       },
       "risk": 41,
@@ -4326,7 +4329,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 0,
@@ -4343,7 +4346,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 0,
@@ -4360,7 +4363,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 0,
@@ -4377,7 +4380,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 0,
@@ -4394,7 +4397,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 39,
@@ -4411,7 +4414,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 39,
@@ -4428,7 +4431,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 39,
@@ -4445,7 +4448,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 39,
@@ -4462,7 +4465,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 40,
@@ -4479,7 +4482,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 40,
@@ -4496,7 +4499,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 40,
@@ -4513,7 +4516,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "clerk-invoices"
       },
       "risk": 40,
@@ -4530,7 +4533,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "__default__"
       },
       "risk": 41,
@@ -4547,7 +4550,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "__default__"
       },
       "risk": 41,
@@ -4564,7 +4567,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "threat-block"
       },
       "risk": 41,
@@ -4581,7 +4584,7 @@
       "expect": {
         "allowed": false,
         "effect": "deny",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "threat-block"
       },
       "risk": 41,

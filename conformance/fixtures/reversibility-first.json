@@ -6,7 +6,7 @@
       "email.send": "irreversible",
       "invoices.approve": "reversible",
       "invoices.pay": "compensable",
-      "invoices.read": "reversible",
+      "invoices.read": "idempotent",
       "payments.wire": "irreversible",
       "vendors.create": "compensable",
       "vendors.update": "reversible"
@@ -23,6 +23,7 @@
         "effect": "allow",
         "id": "reads",
         "max_risk": null,
+        "min_reversibility": null,
         "min_risk": null,
         "min_threat_score": null,
         "reason": "matched rule reads",
@@ -43,6 +44,7 @@
         "effect": "require_approval",
         "id": "risky-needs-human",
         "max_risk": null,
+        "min_reversibility": null,
         "min_risk": 25,
         "min_threat_score": null,
         "reason": "matched rule risky-needs-human",
@@ -63,6 +65,7 @@
         "effect": "require_approval",
         "id": "no-undo",
         "max_risk": null,
+        "min_reversibility": null,
         "min_risk": null,
         "min_threat_score": null,
         "reason": "matched rule no-undo",
@@ -86,21 +89,19 @@
         "effect": "allow",
         "id": "undoable",
         "max_risk": null,
+        "min_reversibility": "compensable",
         "min_risk": null,
         "min_threat_score": null,
         "reason": "matched rule undoable",
         "redact_fields": [],
         "require_roles": [],
-        "reversibility": [
-          "reversible",
-          "compensable"
-        ],
+        "reversibility": [],
         "tools": [
           "*"
         ]
       }
     ],
-    "schema": 1,
+    "schema": 2,
     "unknown_tool_reversibility": "unknown"
   },
   "cases": [
@@ -110,7 +111,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "reads"
       },
       "risk": 0,
@@ -124,7 +125,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "reads"
       },
       "risk": 24,
@@ -138,7 +139,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "reads"
       },
       "risk": 25,
@@ -152,7 +153,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "reads"
       },
       "risk": 26,
@@ -166,7 +167,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "reads"
       },
       "risk": 0,
@@ -182,7 +183,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "reads"
       },
       "risk": 24,
@@ -198,7 +199,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "reads"
       },
       "risk": 25,
@@ -214,7 +215,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "reads"
       },
       "risk": 26,
@@ -230,7 +231,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "reads"
       },
       "risk": 0,
@@ -247,7 +248,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "reads"
       },
       "risk": 24,
@@ -264,7 +265,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "reads"
       },
       "risk": 25,
@@ -281,7 +282,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "reads"
       },
       "risk": 26,
@@ -298,7 +299,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "reads"
       },
       "risk": 0,
@@ -312,7 +313,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "reads"
       },
       "risk": 24,
@@ -326,7 +327,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "reads"
       },
       "risk": 25,
@@ -340,7 +341,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "reads"
       },
       "risk": 26,
@@ -354,7 +355,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "reads"
       },
       "risk": 0,
@@ -370,7 +371,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "reads"
       },
       "risk": 24,
@@ -386,7 +387,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "reads"
       },
       "risk": 25,
@@ -402,7 +403,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "reads"
       },
       "risk": 26,
@@ -418,7 +419,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "reads"
       },
       "risk": 0,
@@ -435,7 +436,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "reads"
       },
       "risk": 24,
@@ -452,7 +453,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "reads"
       },
       "risk": 25,
@@ -469,7 +470,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "reads"
       },
       "risk": 26,
@@ -486,7 +487,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "undoable"
       },
       "risk": 0,
@@ -500,7 +501,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "undoable"
       },
       "risk": 24,
@@ -514,7 +515,7 @@
       "expect": {
         "allowed": false,
         "effect": "require_approval",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "risky-needs-human"
       },
       "risk": 25,
@@ -528,7 +529,7 @@
       "expect": {
         "allowed": false,
         "effect": "require_approval",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "risky-needs-human"
       },
       "risk": 26,
@@ -542,7 +543,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "undoable"
       },
       "risk": 0,
@@ -558,7 +559,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "undoable"
       },
       "risk": 24,
@@ -574,7 +575,7 @@
       "expect": {
         "allowed": false,
         "effect": "require_approval",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "risky-needs-human"
       },
       "risk": 25,
@@ -590,7 +591,7 @@
       "expect": {
         "allowed": false,
         "effect": "require_approval",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "risky-needs-human"
       },
       "risk": 26,
@@ -606,7 +607,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "undoable"
       },
       "risk": 0,
@@ -623,7 +624,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "undoable"
       },
       "risk": 24,
@@ -640,7 +641,7 @@
       "expect": {
         "allowed": false,
         "effect": "require_approval",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "risky-needs-human"
       },
       "risk": 25,
@@ -657,7 +658,7 @@
       "expect": {
         "allowed": false,
         "effect": "require_approval",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "risky-needs-human"
       },
       "risk": 26,
@@ -674,7 +675,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "undoable"
       },
       "risk": 0,
@@ -688,7 +689,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "undoable"
       },
       "risk": 24,
@@ -702,7 +703,7 @@
       "expect": {
         "allowed": false,
         "effect": "require_approval",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "risky-needs-human"
       },
       "risk": 25,
@@ -716,7 +717,7 @@
       "expect": {
         "allowed": false,
         "effect": "require_approval",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "risky-needs-human"
       },
       "risk": 26,
@@ -730,7 +731,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "undoable"
       },
       "risk": 0,
@@ -746,7 +747,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "undoable"
       },
       "risk": 24,
@@ -762,7 +763,7 @@
       "expect": {
         "allowed": false,
         "effect": "require_approval",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "risky-needs-human"
       },
       "risk": 25,
@@ -778,7 +779,7 @@
       "expect": {
         "allowed": false,
         "effect": "require_approval",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "risky-needs-human"
       },
       "risk": 26,
@@ -794,7 +795,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "undoable"
       },
       "risk": 0,
@@ -811,7 +812,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "undoable"
       },
       "risk": 24,
@@ -828,7 +829,7 @@
       "expect": {
         "allowed": false,
         "effect": "require_approval",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "risky-needs-human"
       },
       "risk": 25,
@@ -845,7 +846,7 @@
       "expect": {
         "allowed": false,
         "effect": "require_approval",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "risky-needs-human"
       },
       "risk": 26,
@@ -862,7 +863,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "undoable"
       },
       "risk": 0,
@@ -876,7 +877,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "undoable"
       },
       "risk": 24,
@@ -890,7 +891,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "undoable"
       },
       "risk": 25,
@@ -904,7 +905,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "undoable"
       },
       "risk": 26,
@@ -918,7 +919,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "undoable"
       },
       "risk": 0,
@@ -934,7 +935,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "undoable"
       },
       "risk": 24,
@@ -950,7 +951,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "undoable"
       },
       "risk": 25,
@@ -966,7 +967,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "undoable"
       },
       "risk": 26,
@@ -982,7 +983,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "undoable"
       },
       "risk": 0,
@@ -999,7 +1000,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "undoable"
       },
       "risk": 24,
@@ -1016,7 +1017,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "undoable"
       },
       "risk": 25,
@@ -1033,7 +1034,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "undoable"
       },
       "risk": 26,
@@ -1050,7 +1051,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "undoable"
       },
       "risk": 0,
@@ -1064,7 +1065,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "undoable"
       },
       "risk": 24,
@@ -1078,7 +1079,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "undoable"
       },
       "risk": 25,
@@ -1092,7 +1093,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "undoable"
       },
       "risk": 26,
@@ -1106,7 +1107,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "undoable"
       },
       "risk": 0,
@@ -1122,7 +1123,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "undoable"
       },
       "risk": 24,
@@ -1138,7 +1139,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "undoable"
       },
       "risk": 25,
@@ -1154,7 +1155,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "undoable"
       },
       "risk": 26,
@@ -1170,7 +1171,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "undoable"
       },
       "risk": 0,
@@ -1187,7 +1188,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "undoable"
       },
       "risk": 24,
@@ -1204,7 +1205,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "undoable"
       },
       "risk": 25,
@@ -1221,7 +1222,7 @@
       "expect": {
         "allowed": true,
         "effect": "allow",
-        "reversibility": "reversible",
+        "reversibility": "idempotent",
         "rule_id": "undoable"
       },
       "risk": 26,

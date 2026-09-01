@@ -31,8 +31,11 @@ REVERSIBILITY_FIRST = {
          "actions": ["write"], "min_risk": 25},
         {"id": "no-undo", "effect": "require_approval",
          "reversibility": ["irreversible", "unknown"]},
+        # A floor rather than a set, so the fixtures exercise rank comparison and
+        # not just membership. Naming the postures here is what let `idempotent`
+        # fall through to the default effect when it was added.
         {"id": "undoable", "effect": "allow",
-         "reversibility": ["reversible", "compensable"]},
+         "min_reversibility": "compensable"},
     ],
 }
 
@@ -50,17 +53,51 @@ ROLES_AND_GLOBS = {
     ],
 }
 
-SUITES = (REVERSIBILITY_FIRST, ROLES_AND_GLOBS)
+# A floor with nothing ahead of it. In REVERSIBILITY_FIRST the `no-undo` rule
+# intercepts irreversible and unknown before they ever reach the floor rule, so
+# an enforcer that ignored `min_reversibility` altogether still produced every
+# expected verdict and the mutation for it survived. Coverage of a comparison
+# means a case where getting it wrong changes the answer; here the floor is the
+# only thing between a one-way call and an allow.
+FLOOR_ONLY = {
+    "name": "floor-only",
+    "default_effect": "deny",
+    "rules": [
+        {"id": "safe-enough", "effect": "allow", "min_reversibility": "compensable",
+         "reason": "recoverable enough to proceed without a human"},
+    ],
+}
+
+SUITES = (REVERSIBILITY_FIRST, ROLES_AND_GLOBS, FLOOR_ONLY)
+
+
+def _registry():
+    """The AP starter registry, plus one tool per posture it does not carry.
+
+    The starter registry declares reversible, compensable and irreversible tools
+    and no idempotent one, so 3,960 fixtures covered four postures out of five
+    and the newest — the one most likely to be handled differently by two
+    runtimes — was never put through the enforcer at all. A conformance suite
+    that cannot exercise a posture cannot detect a disagreement about it.
+    """
+    from revoco.reversal import InverseSpec, Reversibility, ap_starter_registry
+
+    reg = ap_starter_registry()
+    reg.register(InverseSpec(
+        tool="invoices.read",
+        kind=Reversibility.IDEMPOTENT,
+        notes="A read changes nothing. Present so the fixtures cover the posture.",
+    ))
+    return reg
 
 
 def main() -> int:
     from revoco.gate import load_policy
-    from revoco.reversal import ap_starter_registry
 
     out_dir = Path(__file__).resolve().parent.parent / "conformance" / "fixtures"
     built = []
     for spec in SUITES:
-        built.append(generate(load_policy(spec), ap_starter_registry(), spec["name"]))
+        built.append(generate(load_policy(spec), _registry(), spec["name"]))
 
     for path, suite in zip(write(out_dir, built), built):
         print(f"  {path.name:<26} {len(suite['cases']):>5} cases")

@@ -6,7 +6,7 @@ readme = "README.md"
 requires-python = ">=3.10"
 license = "Apache-2.0"
 authors = [{ name = "rsh1k" }]
-dependencies = ["revoco>=0.5.2"]
+dependencies = ["revoco>=0.5.3"]
 
 [project.urls]
 Homepage = "https://github.com/rsh1k/recoup"

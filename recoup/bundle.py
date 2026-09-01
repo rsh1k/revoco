@@ -26,11 +26,31 @@ import json
 from dataclasses import dataclass
 from typing import Any
 
-SCHEMA = 1
+# Bumped to 2 when rules gained `min_reversibility`. The enforcer refuses a
+# schema it does not recognise rather than guessing which rules changed meaning,
+# so a version mismatch is a loud startup failure instead of a policy that
+# quietly means something else.
+SCHEMA = 2
 
 
 class BundleError(RuntimeError):
     """A policy that cannot be compiled without changing what it means."""
+
+
+def _floor(rule: Any) -> str | None:
+    """A rule's reversibility floor, if it states one.
+
+    revoco gained this after the bundle schema was first written. Dropping it
+    silently would compile "allow anything at least as recoverable as
+    compensable" into a rule with an empty posture list — and an empty list means
+    *any* posture to the enforcer, so the floor would become a wildcard that
+    admits irreversible work. Widening a rule during compilation is the one thing
+    this module refuses to do.
+    """
+    floor = getattr(rule, "min_reversibility", None)
+    if floor is None:
+        return None
+    return getattr(floor, "value", str(floor))
 
 
 def _rule_to_dict(rule: Any) -> dict[str, Any]:
@@ -60,6 +80,7 @@ def _rule_to_dict(rule: Any) -> dict[str, Any]:
         "agents": list(rule.agents),
         "require_roles": list(rule.require_roles),
         "reversibility": [r.value for r in rule.reversibility],
+        "min_reversibility": _floor(rule),
         "min_risk": rule.min_risk,
         "max_risk": rule.max_risk,
         "min_threat_score": rule.min_threat_score,
@@ -155,6 +176,14 @@ def _glob(value: str, pattern: str) -> bool:
     return fnmatch.fnmatchcase(value, pattern)
 
 
+# Mirrors reversibilityRank in internal/decision/decision.go and
+# Reversibility.rank in revoco. An unrecognised posture ranks below every floor
+# rather than above it: a rank this build cannot compare is one it must not
+# wave through.
+_RANK = {"unknown": 0, "irreversible": 1, "compensable": 2, "reversible": 3,
+         "idempotent": 4}
+
+
 def _any_glob(value: str, patterns: list[str]) -> bool:
     return any(_glob(value, p) for p in patterns)
 
@@ -171,6 +200,9 @@ def evaluate(bundle: dict[str, Any], call: Call) -> Verdict:
         if not _any_glob(call.agent_id, rule["agents"]):
             continue
         if rule["require_roles"] and not all(r in call.roles for r in rule["require_roles"]):
+            continue
+        floor = rule.get("min_reversibility")
+        if floor is not None and _RANK.get(rev, -1) < _RANK.get(floor, 99):
             continue
         if rule["reversibility"] and rev not in rule["reversibility"]:
             continue

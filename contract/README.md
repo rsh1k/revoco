@@ -36,7 +36,7 @@ never parses Python, never imports revoco, and has no opinion of its own.
 
 ```json
 {
-  "schema": 1,
+  "schema": 2,
   "policy_id": "retie-default@1",
   "default_effect": "deny",
   "reversibility": { "invoices.read": "reversible", "payments.wire": "irreversible" },
@@ -80,10 +80,20 @@ fixtures include cases that separate the two.
 
 **Conditions and budgets.** revoco rules can carry an argument-aware `condition`
 and a spend `budget` that participates in matching. Both are expressible, and
-neither is in schema 1 — a rule using them is rejected at compile time rather
-than silently compiled into something weaker. Refusing to compile is the only
-safe failure here: a bundle that quietly dropped a condition would widen a rule
-without anyone noticing.
+neither is in the bundle schema — a rule using them is rejected at compile time
+rather than silently compiled into something weaker. Refusing to compile is the
+only safe failure here: a bundle that quietly dropped a condition would widen a
+rule without anyone noticing.
+
+**`min_reversibility` is why the schema is at 2.** revoco gained a rank-compared
+floor as an alternative to naming the postures, and dropping it during
+compilation would have been the exact failure the paragraph above guards
+against: a floor-only rule compiles to an empty posture list, an empty list means
+*any* posture to the enforcer, and "allow anything at least as recoverable as
+compensable" would have silently become "allow anything at all", irreversible
+included. The field is now carried, and the schema bump means an older enforcer
+refuses the bundle outright rather than reading a rule that means something
+wider than it says.
 
 ## The oracle
 

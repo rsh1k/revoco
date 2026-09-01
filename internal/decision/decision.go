@@ -43,18 +43,35 @@ const (
 // compiler writes them all out explicitly so that neither runtime has to invent
 // a default, which is the class of bug most likely to make the two disagree.
 type Rule struct {
-	ID             string   `json:"id"`
-	Effect         Effect   `json:"effect"`
-	Tools          []string `json:"tools"`
-	Actions        []string `json:"actions"`
-	Agents         []string `json:"agents"`
-	RequireRoles   []string `json:"require_roles"`
-	Reversibility  []string `json:"reversibility"`
-	MinRisk        *int     `json:"min_risk"`
-	MaxRisk        *int     `json:"max_risk"`
-	MinThreatScore *int     `json:"min_threat_score"`
-	RedactFields   []string `json:"redact_fields"`
-	Reason         string   `json:"reason"`
+	ID            string   `json:"id"`
+	Effect        Effect   `json:"effect"`
+	Tools         []string `json:"tools"`
+	Actions       []string `json:"actions"`
+	Agents        []string `json:"agents"`
+	RequireRoles  []string `json:"require_roles"`
+	Reversibility []string `json:"reversibility"`
+	// A floor on recoverability, compared by rank, as an alternative to naming
+	// the postures. A rule carries one or the other, never both.
+	MinReversibility *string  `json:"min_reversibility"`
+	MinRisk          *int     `json:"min_risk"`
+	MaxRisk          *int     `json:"max_risk"`
+	MinThreatScore   *int     `json:"min_threat_score"`
+	RedactFields     []string `json:"redact_fields"`
+	Reason           string   `json:"reason"`
+}
+
+// reversibilityRank orders the postures by how much recoverability they carry,
+// mirroring revoco's Reversibility.rank. `unknown` sits below `irreversible`
+// deliberately: an unclassified tool is worse than a known one-way door, because
+// with the latter you at least know to require approval. `idempotent` sits above
+// `reversible` for the mirror reason — an action that changed nothing is safer
+// than one that changed something and can change it back.
+var reversibilityRank = map[string]int{
+	"unknown":      0,
+	"irreversible": 1,
+	"compensable":  2,
+	"reversible":   3,
+	"idempotent":   4,
 }
 
 // GlobKind pairs a tool-name pattern with the reversibility it implies.
@@ -95,7 +112,7 @@ type Verdict struct {
 }
 
 // SupportedSchema is the only bundle version this build understands.
-const SupportedSchema = 1
+const SupportedSchema = 2
 
 // Load reads and validates a bundle.
 //
@@ -125,6 +142,20 @@ func Load(r io.Reader) (*Bundle, error) {
 			return nil, fmt.Errorf(
 				"rule %q omits tools, actions or agents. The compiler writes these "+
 					"explicitly; a bundle without them was not produced by it", rule.ID)
+		}
+		if rule.MinReversibility != nil {
+			if _, ok := reversibilityRank[*rule.MinReversibility]; !ok {
+				return nil, fmt.Errorf(
+					"rule %q sets min_reversibility to %q, which this enforcer does "+
+						"not recognise. Refusing rather than treating an unknown "+
+						"floor as no floor", rule.ID, *rule.MinReversibility)
+			}
+			if len(rule.Reversibility) > 0 {
+				return nil, fmt.Errorf(
+					"rule %q states both a reversibility set and a "+
+						"min_reversibility floor. Two answers to which postures "+
+						"match is no answer", rule.ID)
+			}
 		}
 	}
 	return &b, nil
@@ -205,6 +236,17 @@ func (r *Rule) matches(c *Call, rev string) bool {
 	}
 	for _, want := range r.RequireRoles {
 		if !hasRole(c.Roles, want) {
+			return false
+		}
+	}
+	// Floor first, then the exact set — the same order as revoco's matcher, so
+	// the two stay readable as translations of each other.
+	if r.MinReversibility != nil {
+		want, wantOK := reversibilityRank[*r.MinReversibility]
+		got, gotOK := reversibilityRank[rev]
+		// An unrecognised posture fails the floor rather than passing it. A rank
+		// this build does not know is a rank it cannot compare safely.
+		if !wantOK || !gotOK || got < want {
 			return false
 		}
 	}

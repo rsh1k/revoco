@@ -58,6 +58,15 @@ MUTATIONS = [
     ("tool glob ignored",
      "if !matchAny(c.Tool, r.Tools) {",
      "if false && !matchAny(c.Tool, r.Tools) {"),
+    # The floor arrived after the first nine. It is the most recently written
+    # comparison in the matcher and therefore the least evidenced, so it gets a
+    # boundary mutation and an ignore mutation like everything else.
+    ("min_reversibility boundary",
+     "if !wantOK || !gotOK || got < want {",
+     "if !wantOK || !gotOK || got <= want {"),
+    ("min_reversibility floor ignored",
+     "\tif r.MinReversibility != nil {",
+     "\tif false && r.MinReversibility != nil {"),
     ("glob crosses to path.Match semantics",
      '\t\t\tout.WriteString(".*")',
      '\t\t\tout.WriteString("[^/]*")'),

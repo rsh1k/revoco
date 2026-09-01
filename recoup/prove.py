@@ -46,7 +46,14 @@ from dataclasses import dataclass, field
 from itertools import product
 from typing import Any, Iterator
 
-REVERSIBILITIES = ("reversible", "compensable", "irreversible", "unknown")
+# Every posture the enforcer can be handed, so the witness space covers all of
+# them. `idempotent` arrived with revoco 0.5.3; leaving it out would let the
+# analysis report a policy safe over a posture it never tried.
+REVERSIBILITIES = ("idempotent", "reversible", "compensable", "irreversible", "unknown")
+
+# Mirrors reversibilityRank in internal/decision/decision.go.
+_RANK = {"unknown": 0, "irreversible": 1, "compensable": 2, "reversible": 3,
+         "idempotent": 4}
 
 # Patterns we can synthesise a witness for with certainty. Anything else makes
 # the analysis incomplete, and incompleteness is reported rather than hidden.
@@ -155,6 +162,9 @@ def _matches(rule: dict[str, Any], w: Witness) -> bool:
     if not any(fnmatch.fnmatchcase(w.agent_id, p) for p in rule["agents"]):
         return False
     if any(role not in w.roles for role in rule["require_roles"]):
+        return False
+    floor = rule.get("min_reversibility")
+    if floor is not None and _RANK.get(w.reversibility, -1) < _RANK.get(floor, 99):
         return False
     if rule["reversibility"] and w.reversibility not in rule["reversibility"]:
         return False
