@@ -4,8 +4,12 @@ from __future__ import annotations
 
 import json
 
+import pytest
+
+from revoco.adapters import EQUIVALENCES, SURFACES, equivalence
 from revoco.cli import main
 from revoco.demo import run_demo
+from revoco.reversal.model import Reversibility
 
 
 def test_demo_ends_with_the_fraud_undone(capsys):
@@ -82,3 +86,43 @@ def test_cli_inverses_check_round_trips_the_starter_registry(tmp_path, capsys):
     f.write_text(json.dumps(ap_starter_registry().to_dict()))
     assert main(["inverses-check", str(f)]) == 0
     assert "inverse specs" in capsys.readouterr().out
+
+
+def test_every_posture_gets_a_column_so_the_surface_rows_add_up(capsys):
+    """The table hard-coded four columns while the counts came from the enum, so
+    adding IDEMPOTENT silently dropped a spec: workstation printed 14 specs above
+    a row summing to 13. A row that does not add up is worse than a missing column,
+    because nothing about it looks wrong.
+    """
+    assert main(["surfaces"]) == 0
+    lines = capsys.readouterr().out.splitlines()
+    header = next(ln for ln in lines if ln.strip().startswith("surface"))
+    cols = header.split()[2:-1]          # drop 'surface', 'specs', 'equivalence'
+    assert len(cols) == len(list(Reversibility))
+
+    for row in lines:
+        parts = row.split()
+        if len(parts) < 2 + len(cols) or parts[0] not in SURFACES:
+            continue
+        total, counts = int(parts[1]), [int(x) for x in parts[2:2 + len(cols)]]
+        assert sum(counts) == total, f"{parts[0]}: {counts} does not sum to {total}"
+
+
+def test_every_surface_states_whether_it_has_an_equivalence_relation():
+    """Absent is recorded rather than defaulted, so adding a surface forces the
+    decision instead of silently inheriting exact-match comparison."""
+    assert set(EQUIVALENCES) == set(SURFACES)
+    assert EQUIVALENCES["workstation"] is not None
+
+
+def test_the_missing_equivalence_surfaces_are_named_rather_than_just_counted(capsys):
+    assert main(["surfaces"]) == 0
+    out = capsys.readouterr().out
+    assert "surfaces with a declared equivalence 1/8" in out
+    for name in ("sap", "workday", "cloud"):
+        assert name in out.split("No equivalence relation is declared for:")[1]
+
+
+def test_an_unknown_surface_is_refused_rather_than_reported_as_having_none():
+    with pytest.raises(KeyError):
+        equivalence("nosuchsurface")
