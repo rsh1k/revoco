@@ -239,25 +239,55 @@ def _cmd_bench(args: argparse.Namespace) -> int:
     return 1 if bad else 0
 
 
+# Column labels for the posture table. Anything not named here still gets a column
+# from its own value, because a hard-coded set of columns is how a posture added to
+# the taxonomy silently stops being counted and the rows quietly stop adding up.
+_POSTURE_ABBR = {
+    Reversibility.IDEMPOTENT: "idem",
+    Reversibility.REVERSIBLE: "rev",
+    Reversibility.COMPENSABLE: "comp",
+    Reversibility.IRREVERSIBLE: "irr",
+    Reversibility.UNKNOWN: "unk",
+}
+
+
 def _cmd_surfaces(args: argparse.Namespace) -> int:
-    from .adapters import SURFACES, all_specs, gate_catalog, summary
+    from .adapters import EQUIVALENCES, SURFACES, all_specs, gate_catalog, summary
 
     if args.json:
-        print(json.dumps({"summary": summary(), "gates": gate_catalog()}, indent=2))
+        print(json.dumps({
+            "summary": summary(),
+            "gates": gate_catalog(),
+            "equivalences": {
+                name: (
+                    {
+                        "name": eq.name,
+                        "exempt": [
+                            {"field": e.field, "reason": e.reason} for e in eq.exempt
+                        ],
+                    }
+                    if eq else None
+                )
+                for name, eq in EQUIVALENCES.items()
+            },
+        }, indent=2))
         return 0
 
     s = summary()
+    postures = sorted(Reversibility, key=lambda k: -k.rank)
+    head = "".join(f"{_POSTURE_ABBR.get(k, k.value[:4]):>5s}" for k in postures)
     print(f"{s['specs']} inverse specs across {len(SURFACES)} surfaces\n")
-    print(f"  {'surface':14s} {'specs':>5s}  {'rev':>4s} {'comp':>4s} {'irr':>4s} {'unk':>4s}")
+    print(f"  {'surface':14s} {'specs':>5s} {head}  {'equivalence':>11s}")
     for name in SURFACES:
         specs = all_specs(name)
-        counts = {k.value: 0 for k in Reversibility}
+        counts = {k: 0 for k in Reversibility}
         for sp in specs:
-            counts[sp.kind.value] += 1
+            counts[sp.kind] += 1
+        row = "".join(f"{counts[k]:5d}" for k in postures)
+        eq = EQUIVALENCES.get(name)
         print(
-            f"  {name:14s} {len(specs):5d}  "
-            f"{counts['reversible']:4d} {counts['compensable']:4d} "
-            f"{counts['irreversible']:4d} {counts['unknown']:4d}"
+            f"  {name:14s} {len(specs):5d} {row}  "
+            f"{(eq.name if eq else '—'):>11s}"
         )
     print()
     print(f"  sequenced undos (>1 step)          {s['sequenced']}")
@@ -266,6 +296,8 @@ def _cmd_surfaces(args: argparse.Namespace) -> int:
     print(f"  recoverable ONLY via snapshot      {s['snapshot_dependent']}")
     print(f"  may degrade for a given target     {s['degradable']}")
     print(f"  distinct gates to implement        {s['gates']}")
+    declared = [n for n, eq in EQUIVALENCES.items() if eq is not None]
+    print(f"  surfaces with a declared equivalence {len(declared)}/{len(SURFACES)}")
     print()
     print(
         "  'recoverable ONLY via snapshot' is the share of the undo surface this\n"
@@ -274,6 +306,31 @@ def _cmd_surfaces(args: argparse.Namespace) -> int:
         "  the target's configuration, so an unchecked authorize-phase gate there is a\n"
         "  phantom rollback waiting to happen."
     )
+
+    if len(declared) < len(SURFACES):
+        print()
+        missing = [n for n in SURFACES if EQUIVALENCES.get(n) is None]
+        print(
+            "  No equivalence relation is declared for: "
+            + ", ".join(missing)
+            + ".\n"
+            "  Until one exists a drill on those surfaces requires every reported\n"
+            "  field to match exactly, which no real system survives — so whoever\n"
+            "  runs the first drill decides at the call site what 'restored' means,\n"
+            "  and the result cannot be argued with afterwards. Write the relation\n"
+            "  before the drill, not after seeing what fails."
+        )
+
+    if args.equivalence:
+        print("\nDeclared state-equivalence relations:\n")
+        for name in args.surface or SURFACES:
+            eq = EQUIVALENCES.get(name)
+            if eq is None:
+                print(f"  {name}: none declared")
+                continue
+            for line in eq.describe().splitlines():
+                print(f"  {line}")
+            print()
 
     if args.gates:
         cat = gate_catalog(*(args.surface or ()))
@@ -335,6 +392,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     sf = sub.add_parser("surfaces", help="what the bundled adapters cover")
     sf.add_argument("--gates", action="store_true", help="list every gate to implement")
+    sf.add_argument("--equivalence", action="store_true",
+                    help="print each surface's declared state-equivalence relation")
     sf.add_argument("--surface", action="append", help="restrict --gates to a surface")
     sf.add_argument("--json", action="store_true")
     sf.set_defaults(func=_cmd_surfaces)

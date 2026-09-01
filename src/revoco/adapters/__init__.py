@@ -46,7 +46,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from ..reversal.model import InverseSpec, ReversalGate, Reversibility
+from ..reversal.model import InverseSpec, ReversalGate, Reversibility, StateEquivalence
 from ..reversal.registry import InverseRegistry
 from . import cloud, database, devops, identity, ras_eval, saas, sap, workday, workstation
 from .cloud import CLOUD_GATES, CLOUD_SPECS, cloud_registry
@@ -57,7 +57,12 @@ from .ras_eval import RAS_EVAL_SPECS, ras_eval_registry
 from .saas import SAAS_GATES, SAAS_SPECS, saas_registry
 from .sap import SAP_GATES, SAP_SPECS, sap_registry
 from .workday import WORKDAY_GATES, WORKDAY_SPECS, workday_registry
-from .workstation import WORKSTATION_GATES, WORKSTATION_SPECS, workstation_registry
+from .workstation import (
+    WORKSTATION_EQUIVALENCE,
+    WORKSTATION_GATES,
+    WORKSTATION_SPECS,
+    workstation_registry,
+)
 
 # Surface name -> (specs, gates). Ordered roughly by blast radius.
 SURFACES: dict[str, tuple[list[InverseSpec], tuple[ReversalGate, ...]]] = {
@@ -70,6 +75,30 @@ SURFACES: dict[str, tuple[list[InverseSpec], tuple[ReversalGate, ...]]] = {
     "saas": (SAAS_SPECS, SAAS_GATES),
     "workstation": (WORKSTATION_SPECS, WORKSTATION_GATES),
 }
+
+
+# Which surfaces have written down what "state returned" means for them. A drill
+# without one falls back to requiring every reported field to match exactly, which
+# no real system survives — so whoever runs the first drill invents a relation at
+# the call site, and the number it produces cannot be argued with afterwards.
+# Absent is tracked rather than defaulted, because the gap is the reportable thing.
+EQUIVALENCES: dict[str, StateEquivalence | None] = {
+    "sap": None,
+    "workday": None,
+    "cloud": None,
+    "identity": None,
+    "devops": None,
+    "database": None,
+    "saas": None,
+    "workstation": WORKSTATION_EQUIVALENCE,
+}
+
+
+def equivalence(surface: str) -> StateEquivalence | None:
+    """The declared state-equivalence relation for a surface, if it has one."""
+    if surface not in SURFACES:
+        raise KeyError(f"unknown surface {surface!r}; known: {sorted(SURFACES)}")
+    return EQUIVALENCES.get(surface)
 
 
 def all_specs(*surfaces: str) -> list[InverseSpec]:
