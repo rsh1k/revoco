@@ -32,9 +32,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/rsh1k/recoup/internal/decision"
-	"github.com/rsh1k/recoup/internal/journal"
-	"github.com/rsh1k/recoup/internal/translog"
+	"github.com/rsh1k/revoco/recoup/internal/decision"
+	"github.com/rsh1k/revoco/recoup/internal/journal"
+	"github.com/rsh1k/revoco/recoup/internal/translog"
 )
 
 type mode string

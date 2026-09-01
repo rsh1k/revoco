@@ -27,7 +27,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/rsh1k/recoup/internal/translog"
+	"github.com/rsh1k/revoco/recoup/internal/translog"
 )
 
 // receipt is what the enforcer hands back on a decision, plus the proof fetched

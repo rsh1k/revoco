@@ -1,3 +1,3 @@
-module github.com/rsh1k/recoup
+module github.com/rsh1k/revoco/recoup
 
 go 1.24
