@@ -30,6 +30,23 @@ question only about permission ("may this agent do it?") and starts also being a
 question about recoverability ("and can we take it back if it was wrong?").
 Unclassified tools are grouped with irreversible ones deliberately: the safe
 reading of "we have not mapped an undo for this yet" is "assume there is none".
+
+``reversibility`` is an exact set, and the mirror of the rule above is easy to
+forget: an *allow* rule naming ``[reversible, compensable]`` silently excludes
+``idempotent``, refusing the one class of action that changed nothing at all.
+Every value added to the taxonomy repeats that, in every policy anyone has
+already written, and the failure is silent — the new class matches no rule and
+falls through to the default effect.
+
+So allow rules should state a floor instead::
+
+    - id: undoable-writes
+      effect: allow
+      min_reversibility: compensable
+
+which admits compensable, reversible and idempotent by rank, and keeps admitting
+whatever safer class is defined next. The two are mutually exclusive: a rule
+gives a set or a floor, never both.
 """
 
 from __future__ import annotations
@@ -71,7 +88,12 @@ class Rule:
     agents: tuple[str, ...] = ("*",)         # agent-id globs
     require_roles: tuple[str, ...] = ()      # agent must hold ALL of these
     actions: tuple[str, ...] = ("*",)        # action-type globs: read/write/...
-    reversibility: tuple[Reversibility, ...] = ()   # empty = any
+    reversibility: tuple[Reversibility, ...] = ()   # exact set; empty = any
+    # A floor instead of a set, compared on rank. Prefer it in allow rules: a set
+    # has to be revisited every time the taxonomy gains a value, and the failure
+    # mode of forgetting is silent — the new class matches nothing and falls
+    # through to the default effect.
+    min_reversibility: Reversibility | None = None
     condition: Condition = field(default_factory=AlwaysTrue)
     redact_fields: tuple[str, ...] = ()
     budget: Budget | None = None
@@ -96,6 +118,9 @@ class Rule:
             "actions": list(self.actions),
             "require_roles": list(self.require_roles),
             "reversibility": [r.value for r in self.reversibility],
+            "min_reversibility": (
+                self.min_reversibility.value if self.min_reversibility else None
+            ),
             "when": self.condition.to_dict(),
             "redact_fields": list(self.redact_fields),
             "budget": (
@@ -184,10 +209,30 @@ def _parse_rule(raw: dict[str, Any], index: int) -> Rule:
             )
     reversibility = tuple(Reversibility(r) for r in rev_raw)
 
+    min_rev_raw = raw.get("min_reversibility")
+    min_reversibility = None
+    if min_rev_raw is not None:
+        if min_rev_raw not in _VALID_REVERSIBILITY:
+            raise PolicyError(
+                f"rule '{rid}': min_reversibility must be one of "
+                f"{sorted(_VALID_REVERSIBILITY)}, got {min_rev_raw!r}"
+            )
+        if reversibility:
+            raise PolicyError(
+                f"rule '{rid}': give either 'reversibility' (an exact set) or "
+                "'min_reversibility' (a floor), not both — two answers to which "
+                "postures match is no answer"
+            )
+        min_reversibility = Reversibility(min_rev_raw)
+
     condition = parse_condition(raw.get("when")) if raw.get("when") is not None else AlwaysTrue()
 
     budget = None
-    if "budget" in raw:
+    # `is not None` rather than `in raw`: to_dict() writes every field explicitly,
+    # including `"budget": null`, so a rule could not be loaded back from its own
+    # serialized form. Anything that compiles a policy to a portable bundle round
+    # trips through exactly this path.
+    if raw.get("budget") is not None:
         b = raw["budget"]
         try:
             budget = Budget(key=str(b["key"]), field=str(b["field"]), limit=float(b["limit"]))
@@ -198,7 +243,9 @@ def _parse_rule(raw: dict[str, Any], index: int) -> Rule:
         raise PolicyError(f"rule '{rid}': effect 'redact' requires redact_fields")
 
     def opt_int(name: str) -> int | None:
-        if name not in raw:
+        # Same reason as `budget` above: an explicitly serialized null means absent,
+        # not malformed, or a rule cannot survive its own to_dict().
+        if raw.get(name) is None:
             return None
         try:
             return int(raw[name])
@@ -213,6 +260,7 @@ def _parse_rule(raw: dict[str, Any], index: int) -> Rule:
         actions=actions,
         require_roles=require_roles,
         reversibility=reversibility,
+        min_reversibility=min_reversibility,
         condition=condition,
         redact_fields=redact_fields,
         budget=budget,

@@ -308,3 +308,91 @@ def test_redaction_does_not_mutate_the_input():
 
 def test_redacting_a_missing_field_is_a_no_op():
     assert redact_arguments({"a": 1}, ("nope.deep",)) == {"a": 1}
+
+
+def test_an_action_that_changed_nothing_is_not_refused_where_a_one_way_call_passes():
+    """A rule matches its reversibility list exactly, with no notion of a floor.
+
+    So an allow rule naming only [reversible, compensable] excludes IDEMPOTENT and
+    falls through to the default effect — while a low-risk IRREVERSIBLE call is
+    still allowed by its own rule. That inversion, the safest class denied and the
+    one-way one permitted, is what this guards.
+
+    `reads-always-fine` hides it for anything typed as a read, which is why the
+    probe uses an action type that is idempotent without being a read.
+    """
+    from revoco.bench.harness import default_policy
+
+    engine = PolicyEngine(default_policy(), store=InMemorySessionStore())
+    p = _principal(roles={"operator"})
+
+    def effect(kind: Reversibility) -> str:
+        d = engine.evaluate(tool="preview.render", args={}, principal=p,
+                            session_id="s", action="validate", reversibility=kind,
+                            risk=10)
+        return getattr(d.effect, "value", d.effect)
+
+    assert effect(Reversibility.IDEMPOTENT) == "allow"
+    assert effect(Reversibility.IDEMPOTENT) == effect(Reversibility.REVERSIBLE)
+
+
+def test_a_floor_admits_every_posture_at_least_as_safe_as_itself():
+    """The point of a floor: it does not need revisiting when a class is added."""
+    engine = _engine({
+        "default_effect": "deny",
+        "rules": [{"id": "safe-work", "effect": "allow",
+                   "min_reversibility": "compensable", "reason": "undoable enough"}],
+    })
+    p = _principal()
+
+    def effect(kind: Reversibility) -> str:
+        d = engine.evaluate(tool="t", args={}, principal=p, session_id="s",
+                            action="validate", reversibility=kind)
+        return getattr(d.effect, "value", d.effect)
+
+    assert effect(Reversibility.IDEMPOTENT) == "allow"
+    assert effect(Reversibility.REVERSIBLE) == "allow"
+    assert effect(Reversibility.COMPENSABLE) == "allow"
+    assert effect(Reversibility.IRREVERSIBLE) == "deny"
+    assert effect(Reversibility.UNKNOWN) == "deny"
+
+
+def test_a_rule_cannot_state_the_posture_two_different_ways():
+    with pytest.raises(PolicyError):
+        load_policy({
+            "default_effect": "deny",
+            "rules": [{"id": "both", "effect": "allow",
+                       "reversibility": ["reversible"],
+                       "min_reversibility": "compensable"}],
+        })
+
+
+def test_an_unknown_floor_value_is_refused_at_load():
+    with pytest.raises(PolicyError):
+        load_policy({
+            "default_effect": "deny",
+            "rules": [{"id": "bad", "effect": "allow",
+                       "min_reversibility": "mostly"}],
+        })
+
+
+def test_a_rule_survives_a_round_trip_through_its_own_serialized_form():
+    """to_dict() writes every field explicitly, nulls included, and the loader used
+    to treat a present-but-null field as malformed rather than absent. So a rule
+    could not be read back from what it had just written — which is precisely the
+    path anything compiling a policy into a portable bundle takes.
+    """
+    original = {
+        "id": "safe-work", "effect": "allow",
+        "min_reversibility": "compensable",
+        "tools": ["invoices.*"], "actions": ["write"],
+        "reason": "undoable enough",
+    }
+    once = load_policy({"default_effect": "deny", "rules": [original]})
+    twice = load_policy(
+        {"default_effect": "deny", "rules": [once.rules[0].to_dict()]}
+    )
+    assert twice.rules[0].to_dict() == once.rules[0].to_dict()
+    assert twice.rules[0].min_reversibility is Reversibility.COMPENSABLE
+    assert twice.rules[0].budget is None
+    assert twice.rules[0].min_risk is None

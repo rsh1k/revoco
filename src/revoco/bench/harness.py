@@ -68,9 +68,13 @@ DEFAULT_POLICY: dict[str, Any] = {
         {"id": "routine-irreversible", "effect": "allow", "max_risk": 49,
          "reversibility": ["irreversible", "unknown"],
          "reason": "No rollback path, but low consequence — gated on content, not undo."},
+        # A floor rather than a set. Listing the postures by name meant every new
+        # class in the taxonomy silently fell out of this rule and hit the default
+        # deny — which briefly refused idempotent calls while `routine-irreversible`
+        # above still let one-way ones through. Rank makes that impossible.
         {"id": "undoable-writes", "effect": "allow",
-         "reversibility": ["reversible", "compensable"],
-         "reason": "Undoable write within delegated authority."},
+         "min_reversibility": "compensable",
+         "reason": "Nothing to undo, or an undoable write within delegated authority."},
     ],
 }
 
