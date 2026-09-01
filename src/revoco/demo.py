@@ -131,7 +131,7 @@ DEMO_POLICY = {
          "reason": "Vendor banking changes are the standard payment-fraud vector."},
         {"id": "bounded-payments", "effect": "allow",
          "tools": ["invoices.pay", "invoices.approve"],
-         "reversibility": ["reversible", "compensable"],
+         "min_reversibility": "compensable",
          "budget": {"key": "payments_total", "field": "amount", "limit": 100_000},
          "reason": "Undoable payment inside the session ceiling."},
     ],

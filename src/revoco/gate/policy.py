@@ -352,7 +352,7 @@ STARTER_POLICY: dict[str, Any] = {
             "id": "bounded-reversible-payments",
             "effect": "allow",
             "tools": ["invoices.pay", "invoices.approve"],
-            "reversibility": ["reversible", "compensable"],
+            "min_reversibility": "compensable",
             "budget": {"key": "payments_total", "field": "amount", "limit": 25_000},
             "reason": "Undoable payment within the session ceiling.",
         },

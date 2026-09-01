@@ -117,7 +117,9 @@
     },
     {
       "arg_map": {
-        "manifest": "snapshot.manifest"
+        "manifest": "snapshot.manifest",
+        "name": "args.name",
+        "namespace": "args.namespace"
       },
       "degraded_kind": "irreversible",
       "gates": [
