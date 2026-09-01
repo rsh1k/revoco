@@ -37,10 +37,12 @@ from __future__ import annotations
 
 from ..reversal.model import (
     PHASE_AUTHORIZE,
+    Exemption,
     InverseSpec,
     InverseStep,
     ReversalGate,
     Reversibility,
+    StateEquivalence,
 )
 from ..reversal.registry import InverseRegistry
 
@@ -76,6 +78,36 @@ GATE_TREE_CAPTURED = ReversalGate(
     check_at=PHASE_AUTHORIZE,
 )
 
+WORKSTATION_EQUIVALENCE = StateEquivalence(
+    name="workstation",
+    exempt=(
+        Exemption(
+            field="mtime",
+            reason=(
+                "the inverse for a deleted or overwritten file is a write, and a "
+                "write stamps the current time. The original mtime is captured for "
+                "the evidence pack and cannot be put back."
+            ),
+        ),
+        Exemption(
+            field="inode",
+            reason=(
+                "delete-and-recreate may reuse the number when nothing else holds "
+                "the file, so neither a change nor a match says anything about "
+                "whether the content was restored."
+            ),
+        ),
+        Exemption(
+            field="nlink",
+            reason=(
+                "recreating a file breaks every hard link that pointed at the "
+                "original. Nothing in a filesystem write can re-establish them."
+            ),
+        ),
+    ),
+)
+
+
 GATE_GIT_REFLOG_PRESENT = ReversalGate(
     name="git_commit_still_reachable",
     description=(
@@ -96,9 +128,8 @@ WORKSTATION_SPECS: list[InverseSpec] = [
     # -- filesystem ---------------------------------------------------------
     InverseSpec(
         tool="fs.read_file",
-        kind=Reversibility.REVERSIBLE,
-        inverse_tool="fs.noop",
-        notes="A read changes nothing.",
+        kind=Reversibility.IDEMPOTENT,
+        notes="A read changes nothing, so there is nothing to undo and nothing to prove.",
     ),
     InverseSpec(
         tool="fs.write_file",

@@ -632,7 +632,7 @@ class ControlPlane:
                 for e in self.reversal.entries(
                     state=JournalState.COMMITTED, delegation_id=record.delegation_id
                 )
-                if not e.plan.kind.is_undoable
+                if e.plan.kind.is_one_way
             ]
         )
         findings.extend(

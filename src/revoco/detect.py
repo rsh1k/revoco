@@ -439,7 +439,7 @@ class DetectionEngine:
 
         # PRA01 — unrecoverable blast radius.
         if (
-            not plan.kind.is_undoable
+            plan.kind.is_one_way
             and committed_irreversible_under_grant + 1 >= self.irreversible_fanout_threshold
         ):
             out.append(
@@ -528,7 +528,7 @@ def journal_health(entries: list[JournalEntry]) -> dict[str, Any]:
         "committed": len(committed),
         "actually_undoable": len(executable),
         "phantom_rollbacks": len(phantom),
-        "irreversible": len([e for e in committed if not e.plan.kind.is_undoable]),
+        "irreversible": len([e for e in committed if e.plan.kind.is_one_way]),
         "phantom_details": [
             {
                 "journal_id": e.id,

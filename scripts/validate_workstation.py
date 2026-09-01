@@ -39,6 +39,7 @@ removed afterwards.
 from __future__ import annotations
 
 import argparse
+import dataclasses
 import json
 import os
 import shutil
@@ -51,6 +52,7 @@ from typing import Any
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
 from revoco.adapters import workstation_registry  # noqa: E402
+from revoco.adapters.workstation import WORKSTATION_EQUIVALENCE  # noqa: E402
 from revoco.drills import Canary, DrillOutcome, DrillRunner, RecoverabilityRegister  # noqa: E402
 
 
@@ -284,6 +286,13 @@ def seed_sandbox(ws: RealWorkstation) -> None:
     """Bring one sandbox to a known state before a single drill runs."""
     root = ws.root
     ws.init_repo()
+    # git.reset_hard needs somewhere to reset *to*. With the single commit init_repo
+    # makes, `reset --hard HEAD` moves nothing, the inverse has nothing to restore,
+    # and the drill reports success without exercising anything — the same shape as
+    # the stash-on-a-clean-tree trap below.
+    (ws.repo / "history.txt").write_text("second\n")
+    ws.git("add", "-A")
+    ws.git("commit", "-q", "-m", "second")
     ws.git("branch", "doomed")
     ws.git("branch", "sidebranch")
     # switch_with_stash needs a genuinely dirty tree: `git stash push` on a clean one
@@ -313,9 +322,17 @@ def build_canaries(ws: RealWorkstation) -> list[Canary]:
     root = ws.root
 
     def read(p: str):
+        # mtime is reported but exempt. Watching it is what turns "a write cannot
+        # restore mtime" from a claim probed by hand into residue measured on every
+        # run; exempting it is what stops that truth failing an honest inverse.
         return lambda: (
-            {"content": (root / p).read_text(), "mode": oct((root / p).stat().st_mode & 0o777)[2:]}
-            if (root / p).exists() else {"content": None, "mode": None}
+            {
+                "content": (root / p).read_text(),
+                "mode": oct((root / p).stat().st_mode & 0o777)[2:],
+                "mtime": (root / p).stat().st_mtime,
+            }
+            if (root / p).exists()
+            else {"content": None, "mode": None, "mtime": None}
         )
 
     def tree_state(p: str):
@@ -331,7 +348,7 @@ def build_canaries(ws: RealWorkstation) -> list[Canary]:
     def branch_state(name: str):
         return lambda: {"sha": ws.git("rev-parse", name, check=False)}
 
-    return [
+    canaries = [
         Canary(tool="fs.read_file", args={"path": "canary/file.txt"},
                verify=read("canary/file.txt"), label="read"),
         Canary(tool="fs.write_file",
@@ -353,7 +370,7 @@ def build_canaries(ws: RealWorkstation) -> list[Canary]:
                verify=git_state(), label="commit"),
         Canary(tool="git.branch.delete", args={"name": "doomed"},
                verify=branch_state("doomed"), label="branch-delete"),
-        Canary(tool="git.reset_hard", args={"repo": "repo", "ref": "HEAD"},
+        Canary(tool="git.reset_hard", args={"repo": "repo", "ref": "HEAD~1"},
                verify=git_state(), label="reset-hard"),
         Canary(tool="git.checkout", args={"repo": "repo", "ref": "sidebranch"},
                verify=git_state(), label="checkout"),
@@ -367,6 +384,9 @@ def build_canaries(ws: RealWorkstation) -> list[Canary]:
                    "readme": (ws.repo / "README.md").read_text(),
                }, label="switch-with-stash"),
     ]
+    # One declared relation for the surface, applied uniformly, instead of each
+    # canary deciding for itself what "restored" is allowed to mean.
+    return [dataclasses.replace(c, equivalence=WORKSTATION_EQUIVALENCE) for c in canaries]
 
 
 # ---------------------------------------------------------------------------
@@ -533,13 +553,26 @@ def main() -> int:
 
         failed_drills = [r for r in results if r.outcome.is_alarm]
         false_claims = [c for c in claims if not c["holds"]]
+        # A spec with nothing to prove is not a drill that passed, and it is not one
+        # that failed either. Counting it in the denominator reads as a failure.
+        drillable = [r for r in results if r.outcome is not DrillOutcome.NOT_DRILLABLE]
+        skipped = len(results) - len(drillable)
 
         if args.json:
             print(json.dumps({
+                "equivalence": {
+                    "name": WORKSTATION_EQUIVALENCE.name,
+                    "exempt": [
+                        {"field": e.field, "reason": e.reason}
+                        for e in WORKSTATION_EQUIVALENCE.exempt
+                    ],
+                },
                 "drills": [r.to_dict() for r in results],
                 "claims": claims,
                 "summary": {
                     "drills": len(results),
+                    "drillable": len(drillable),
+                    "not_drillable": skipped,
                     "passed": sum(1 for r in results if r.outcome is DrillOutcome.PASSED),
                     "failed": len(failed_drills),
                     "claims_checked": len(claims),
@@ -558,13 +591,18 @@ def main() -> int:
                 }.get(r.outcome, "FAIL")
                 print(f"  [{mark}] {r.tool:24s} {r.summary[:74]}")
             print()
+            print("STATE EQUIVALENCE  (what 'restored' is allowed to mean here)")
+            for line in WORKSTATION_EQUIVALENCE.describe().splitlines()[1:]:
+                print(f"  {line.strip()}")
+            print()
             print("CLAIM PROBES  (the prose the classifications rest on)")
             for c in claims:
                 print(f"  [{'OK  ' if c['holds'] else 'WRONG'}] {c['spec']:18s} {c['claim']}")
                 print(f"           {c['detail']}")
             print()
             passed = sum(1 for r in results if r.outcome is DrillOutcome.PASSED)
-            print(f"{passed}/{len(results)} drills passed, "
+            tail = f" ({skipped} with nothing to prove)" if skipped else ""
+            print(f"{passed}/{len(drillable)} drills passed{tail}, "
                   f"{len(claims) - len(false_claims)}/{len(claims)} claims held")
             if failed_drills or false_claims:
                 print("\nA failing drill means the spec's inverse does not restore state.")

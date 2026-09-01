@@ -66,12 +66,27 @@ class Reversibility(enum.Enum):
     *below* ``IRREVERSIBLE`` on purpose: an unclassified tool is worse than a
     tool known to be one-way, because with the latter you at least know to
     require approval. Fail-safe means unclassified fails every stated floor.
+
+    ``IDEMPOTENT`` ranks *above* ``REVERSIBLE`` for the mirror reason: an action
+    that never changed anything is safer than one that changed something and can
+    change it back. It exists as its own class because folding reads into
+    ``REVERSIBLE`` inflates every count of how much of an estate can be undone
+    with actions that never needed undoing. Here it means specifically **the
+    action does not modify state** — a read, a query, a dry run. A write that is
+    merely safe to repeat is ``REVERSIBLE``: it moved something, and putting it
+    back is a real operation.
+
+    These values are serialized — into specs, journals, evidence packs, and any
+    policy bundle a downstream enforcer loads. A consumer that enumerates the set
+    rather than reading it must learn ``idempotent`` before it sees one, or it
+    will reject a spec it should simply have priced at zero.
     """
 
     UNKNOWN = "unknown"
     IRREVERSIBLE = "irreversible"
     COMPENSABLE = "compensable"
     REVERSIBLE = "reversible"
+    IDEMPOTENT = "idempotent"
 
     @property
     def rank(self) -> int:
@@ -79,8 +94,24 @@ class Reversibility(enum.Enum):
 
     @property
     def is_undoable(self) -> bool:
-        """Whether an undo path exists at all (exact or approximate)."""
+        """Whether an undo path exists at all (exact or approximate).
+
+        False for ``IDEMPOTENT``, which has no undo path because it has nothing to
+        undo. Callers asking "is this dangerous" want :attr:`is_one_way` instead —
+        the two questions used to share this property and they are not the same.
+        """
         return self in (Reversibility.REVERSIBLE, Reversibility.COMPENSABLE)
+
+    @property
+    def is_one_way(self) -> bool:
+        """Whether the action changed something that nothing can take back.
+
+        The risk question, as opposed to the structural one. ``IDEMPOTENT`` is not
+        one-way despite having no inverse: nothing happened, so nothing is standing
+        exposure. Counting reads as irreversible fan-out would make the alarm
+        useless on any agent that reads more than it writes — which is all of them.
+        """
+        return self in (Reversibility.IRREVERSIBLE, Reversibility.UNKNOWN)
 
 
 _RANKS = {
@@ -88,6 +119,7 @@ _RANKS = {
     Reversibility.IRREVERSIBLE: 1,
     Reversibility.COMPENSABLE: 2,
     Reversibility.REVERSIBLE: 3,
+    Reversibility.IDEMPOTENT: 4,
 }
 
 
@@ -394,6 +426,72 @@ class GateContext:
 
 
 @dataclass(frozen=True)
+class Exemption:
+    """One difference a drill agrees not to hold against an inverse, and why.
+
+    The reason is required for the same purpose ``residue`` is required on a
+    COMPENSABLE spec: an exemption nobody has to justify is where a failing drill
+    quietly becomes a passing one.
+    """
+
+    field: str
+    reason: str
+
+    def __post_init__(self) -> None:
+        if not self.field:
+            raise ValidationError("Exemption.field must be a non-empty string")
+        if not self.reason:
+            raise ValidationError(
+                f"exemption for {self.field!r} needs a reason — an unexplained "
+                "exclusion is how a comparison is tuned until it passes"
+            )
+
+
+@dataclass(frozen=True)
+class StateEquivalence:
+    """What counts as "state returned" on one surface, written down in advance.
+
+    A drill compares state before and after, which sounds exact and is not. Real
+    systems move a timestamp, bump a version counter, append an audit row and
+    change an etag on every write, so requiring byte equality fails every honest
+    inverse. Something has to be excluded.
+
+    That exclusion is the most dangerous knob in the whole method — generous
+    enough and no drill can ever fail — so it is a declared object with a reason
+    per field rather than a tuple assembled at the call site. Publish it with the
+    results and the comparison can be argued with, which is the only defence
+    against having tuned it.
+
+    Exempt fields are not ignored. A drill still watches them and reports the ones
+    that did not come back as :attr:`DrillResult.observed_residue`, which is how a
+    residue gets named from evidence instead of from a vendor document.
+    """
+
+    name: str
+    exempt: tuple[Exemption, ...] = ()
+
+    def __post_init__(self) -> None:
+        if not self.name:
+            raise ValidationError("StateEquivalence.name must be a non-empty string")
+        seen = [e.field for e in self.exempt]
+        if len(seen) != len(set(seen)):
+            raise ValidationError(f"{self.name}: duplicate exempt field in {seen}")
+
+    @property
+    def fields(self) -> frozenset[str]:
+        return frozenset(e.field for e in self.exempt)
+
+    def describe(self) -> str:
+        """The relation as publishable text, one exemption per line."""
+        if not self.exempt:
+            return f"{self.name}: every reported field must return exactly"
+        lines = [f"{self.name}: every reported field must return exactly, except"]
+        lines += [f"  - {e.field}: {e.reason}" for e in sorted(self.exempt,
+                                                               key=lambda e: e.field)]
+        return "\n".join(lines)
+
+
+@dataclass(frozen=True)
 class InverseSpec:
     """How to undo one tool.
 
@@ -459,6 +557,11 @@ class InverseSpec:
             raise ValidationError(
                 f"{self.tool}: COMPENSABLE requires 'residue' naming what the undo "
                 "cannot restore — an unnamed side effect is an unowned risk"
+            )
+        if self.kind is Reversibility.IDEMPOTENT and self.snapshot_fields:
+            raise ValidationError(
+                f"{self.tool}: an IDEMPOTENT action does not modify state, so there "
+                "is no prior state worth capturing"
             )
         if self.window_seconds is not None and self.window_seconds <= 0:
             raise ValidationError(f"{self.tool}: window_seconds must be positive")

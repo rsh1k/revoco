@@ -37,6 +37,11 @@ then **compares state** — the same discipline the containment benchmark uses, 
 the same reason. An inverse that returns 200 and restores nothing passes every
 check except this one.
 
+State is read three times, not two. If the forward action reported success but
+moved nothing, there was never anything to undo, and comparing the first and last
+reads would call that a pass. A drill that cannot fail is not evidence, so that
+case is reported as ``FORWARD_NO_OP`` rather than counted as proof.
+
 Proof-gated classification
 --------------------------
 :class:`RecoverabilityRegister` can be wired into a control plane so that a spec
@@ -55,16 +60,24 @@ import dataclasses
 import enum
 import threading
 import time
+from collections import Counter
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from typing import Any
 
 from .core import crypto, ids
-from .core.errors import ValidationError
+from .core.errors import (
+    NotReversible,
+    ReversalGateClosed,
+    ReversalWindowExpired,
+    ValidationError,
+)
 from .reversal.engine import ReversalEngine
 from .reversal.model import (
+    Exemption,
     InverseExecutor,
     Reversibility,
+    StateEquivalence,
     StateReader,
 )
 from .reversal.registry import InverseRegistry
@@ -74,10 +87,13 @@ DEFAULT_STALE_AFTER = 24 * 3600.0  # a day; tighten for surfaces that change oft
 
 class DrillOutcome(enum.Enum):
     PASSED = "passed"                  # inverse ran and state verifiably returned
-    FAILED = "failed"                  # inverse ran and state did NOT return
+    PARTIAL = "partial"                # inverse restored some of what it moved
+    FAILED = "failed"                  # inverse ran and restored none of it
+    UNAVAILABLE = "unavailable"        # the undo path exists but could not run now
     ERRORED = "errored"                # the inverse call itself raised
     FORWARD_FAILED = "forward_failed"  # could not even set up the drill
-    NOT_DRILLABLE = "not_drillable"    # irreversible by design: nothing to prove
+    FORWARD_NO_OP = "forward_no_op"    # forward succeeded and changed nothing
+    NOT_DRILLABLE = "not_drillable"    # by design there is nothing to prove
 
     @property
     def is_proof(self) -> bool:
@@ -88,10 +104,22 @@ class DrillOutcome(enum.Enum):
     def is_alarm(self) -> bool:
         """Whether this outcome should page someone.
 
-        ``NOT_DRILLABLE`` is not an alarm — an irreversible tool has no inverse to
-        prove and saying so is correct, not a fault.
+        ``NOT_DRILLABLE`` is not an alarm. An irreversible tool has no inverse to
+        prove, and a tool with no side effects has nothing to restore; saying so is
+        correct, not a fault.
+
+        ``FORWARD_NO_OP`` is one, even though nothing raised. A drill whose forward
+        action moved nothing proves nothing about the inverse, and a suite of them
+        reports green while covering none of the surface.
         """
-        return self in (DrillOutcome.FAILED, DrillOutcome.ERRORED, DrillOutcome.FORWARD_FAILED)
+        return self in (
+            DrillOutcome.PARTIAL,
+            DrillOutcome.FAILED,
+            DrillOutcome.UNAVAILABLE,
+            DrillOutcome.ERRORED,
+            DrillOutcome.FORWARD_FAILED,
+            DrillOutcome.FORWARD_NO_OP,
+        )
 
 
 @dataclass(frozen=True)
@@ -111,8 +139,13 @@ class Canary:
     args: dict[str, Any]
     verify: Callable[[], dict[str, Any]]
     label: str = ""
-    # Fields that must match before and after. Empty means compare everything
-    # `verify` returns.
+    # The declared relation deciding which differences count. Prefer this: it
+    # names what is excluded and why, and it is the thing to publish alongside a
+    # result.
+    equivalence: StateEquivalence | None = None
+    # Older, blunter form: compare only these fields. It excludes by omission, so
+    # a field nobody thought of is silently untested — the opposite failure
+    # direction from an exemption someone had to write a reason for.
     compare_fields: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
@@ -120,6 +153,12 @@ class Canary:
             raise ValidationError("Canary.tool is required")
         if not callable(self.verify):
             raise ValidationError(f"Canary for {self.tool} needs a callable verify()")
+        if self.equivalence is not None and self.compare_fields:
+            raise ValidationError(
+                f"Canary for {self.tool}: give either an equivalence relation or "
+                "compare_fields, not both — two answers to which fields count is "
+                "no answer"
+            )
 
     @property
     def name(self) -> str:
@@ -139,7 +178,12 @@ class DrillResult:
     canary: str = ""
     error: str | None = None
     mismatches: tuple[str, ...] = ()
+    restored: tuple[str, ...] = ()
+    unrestored: tuple[str, ...] = ()
+    collateral: tuple[str, ...] = ()
+    unavailable_reason: str = ""
     residue: str = ""
+    observed_residue: tuple[str, ...] = ()
 
     @property
     def proves_recoverable(self) -> bool:
@@ -156,21 +200,77 @@ class DrillResult:
             "canary": self.canary,
             "error": self.error,
             "mismatches": list(self.mismatches),
+            "restored": list(self.restored),
+            "unrestored": list(self.unrestored),
+            "collateral": list(self.collateral),
+            "unavailable_reason": self.unavailable_reason,
             "residue": self.residue,
+            "observed_residue": list(self.observed_residue),
         }
 
     @property
     def summary(self) -> str:
         if self.outcome is DrillOutcome.PASSED:
-            return f"{self.tool}: inverse proven, state returned ({self.duration_ms:.0f}ms)"
+            trail = (
+                f", residue left in {', '.join(self.observed_residue)}"
+                if self.observed_residue else ""
+            )
+            return (
+                f"{self.tool}: inverse proven, state returned "
+                f"({self.duration_ms:.0f}ms){trail}"
+            )
         if self.outcome is DrillOutcome.FAILED:
             return (
                 f"{self.tool}: inverse RAN BUT DID NOT RESTORE — "
                 f"{len(self.mismatches)} field(s) still wrong: {', '.join(self.mismatches[:3])}"
             )
+        if self.outcome is DrillOutcome.PARTIAL:
+            bits = []
+            if self.unrestored:
+                bits.append(
+                    f"{len(self.restored)}/{len(self.restored) + len(self.unrestored)} "
+                    f"field(s) restored, still wrong: {', '.join(self.unrestored[:3])}"
+                )
+            if self.collateral:
+                bits.append(
+                    f"changed {len(self.collateral)} field(s) the forward action "
+                    f"never touched: {', '.join(self.collateral[:3])}"
+                )
+            return f"{self.tool}: PARTIAL undo — {'; '.join(bits)}"
+        if self.outcome is DrillOutcome.UNAVAILABLE:
+            return (
+                f"{self.tool}: no undo available to run ({self.unavailable_reason}) — "
+                f"the inverse was never reached, so nothing about it was tested"
+            )
+        if self.outcome is DrillOutcome.FORWARD_NO_OP:
+            return (
+                f"{self.tool}: forward action changed nothing, so the inverse was "
+                f"never tested — this drill proves nothing"
+            )
         if self.outcome is DrillOutcome.NOT_DRILLABLE:
-            return f"{self.tool}: irreversible by design; nothing to prove"
+            return f"{self.tool}: nothing to prove by design"
         return f"{self.tool}: {self.outcome.value} — {self.error}"
+
+
+def _split(
+    canary: Canary, before: dict[str, Any], after: dict[str, Any]
+) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    """Partition the reported fields into (must return, exempt-but-watched)."""
+    seen = set(before) | set(after)
+    if canary.equivalence is not None:
+        exempt = canary.equivalence.fields
+        return tuple(sorted(seen - exempt)), tuple(sorted(seen & exempt))
+    if canary.compare_fields:
+        declared = set(canary.compare_fields)
+        return tuple(canary.compare_fields), tuple(sorted(seen - declared))
+    return tuple(sorted(seen)), ()
+
+
+def _diff(
+    before: dict[str, Any], after: dict[str, Any], fields: tuple[str, ...]
+) -> tuple[str, ...]:
+    """Which of ``fields`` hold a different value between two reads."""
+    return tuple(f for f in fields if before.get(f) != after.get(f))
 
 
 class DrillRunner:
@@ -213,6 +313,10 @@ class DrillRunner:
                 **kw,
             )
 
+        # Nothing to prove: either no undo path exists, or the action never changed
+        # anything to begin with. IDEMPOTENT covers the second — before it existed a
+        # read was REVERSIBLE with a no-op inverse, so drilling one always passed and
+        # a green result stood in for a test that never happened.
         if spec is None or not spec.kind.is_undoable:
             return done(DrillOutcome.NOT_DRILLABLE)
 
@@ -242,8 +346,37 @@ class DrillRunner:
 
         engine.commit(entry.id, action_id=f"drill-{entry.id}", result=result, now=started)
 
+        # A forward action that reports success and changes nothing leaves the inverse
+        # with nothing to undo, so it "restores" a state that never moved and the drill
+        # goes green. That is a proof of recoverability the drill never earned — the
+        # same credulity this module exists to remove, one level further up.
+        try:
+            midway = dict(canary.verify() or {})
+        except Exception as exc:
+            return done(DrillOutcome.ERRORED,
+                        error=f"verify() failed after the forward action: {exc!r}")
+
+        if not _diff(before, midway, _split(canary, before, midway)[0]):
+            return done(DrillOutcome.FORWARD_NO_OP,
+                        error="forward action reported success but left every compared "
+                              "field unchanged; the inverse was never exercised")
+
+        # An undo that cannot run is not the same event as an undo that ran badly.
+        # A closed window or an unanswerable gate is a fact about the world on the
+        # day of the drill; only the executor blowing up is a fault. Collapsing them
+        # into one bucket is how a surface silently shrinks to the ungated part of
+        # itself while the report still looks like coverage.
         try:
             receipt = engine.reverse(entry.id, self.executor, now=started)
+        except ReversalWindowExpired as exc:
+            return done(DrillOutcome.UNAVAILABLE, unavailable_reason="window_expired",
+                        error=f"{type(exc).__name__}: {exc}")
+        except ReversalGateClosed as exc:
+            return done(DrillOutcome.UNAVAILABLE, unavailable_reason="gate_closed",
+                        error=f"{type(exc).__name__}: {exc}")
+        except NotReversible as exc:
+            return done(DrillOutcome.UNAVAILABLE, unavailable_reason="no_undo_path",
+                        error=f"{type(exc).__name__}: {exc}")
         except Exception as exc:
             return done(DrillOutcome.ERRORED,
                         error=f"{type(exc).__name__}: {exc}")
@@ -258,11 +391,46 @@ class DrillRunner:
             return done(DrillOutcome.ERRORED,
                         error=f"verify() failed after the drill: {exc!r}")
 
-        fields = canary.compare_fields or tuple(sorted(set(before) | set(after)))
-        mismatches = tuple(f for f in fields if before.get(f) != after.get(f))
-        if mismatches:
-            return done(DrillOutcome.FAILED, mismatches=mismatches)
-        return done(DrillOutcome.PASSED)
+        # Three reads let the verdict say how far the undo got, not just whether it
+        # arrived. ``moved`` is what the forward action actually changed, so an inverse
+        # can be scored against the work it was supposed to reverse — and anything
+        # still wrong that the forward never touched is the inverse's own doing.
+        moved = set(_diff(before, midway, _split(canary, before, midway)[0]))
+        compared, exempt = _split(canary, before, after)
+        mismatches = _diff(before, after, compared)
+
+        # Residue, measured rather than quoted. A canary may report more state than
+        # it compares — mtime, an audit row, a notification counter. Anything in
+        # that surplus that did not come back is what the undo left behind, and
+        # naming it from evidence is the only way to tell a residue that is real
+        # from one copied out of a vendor document.
+        observed = _diff(before, after, exempt)
+
+        if not mismatches:
+            return done(DrillOutcome.PASSED, restored=tuple(sorted(moved)),
+                        observed_residue=observed)
+
+        wrong = set(mismatches)
+        unrestored = tuple(sorted(wrong & moved))
+        collateral = tuple(sorted(wrong - moved))
+        restored = tuple(sorted(moved - wrong))
+
+        # Restoring nothing it moved, and breaking nothing else, is the phantom
+        # rollback the drill was built for. Anything in between is partial, which is
+        # a different conversation: the undo works and does not finish.
+        outcome = (
+            DrillOutcome.FAILED
+            if not restored and not collateral
+            else DrillOutcome.PARTIAL
+        )
+        return done(
+            outcome,
+            mismatches=mismatches,
+            restored=restored,
+            unrestored=unrestored,
+            collateral=collateral,
+            observed_residue=observed,
+        )
 
     def drill_all(
         self, canaries: Iterable[Canary], *, now: float | None = None
@@ -333,7 +501,13 @@ class ProvenRecoverability:
         if self.last is None:
             return "never drilled"
         if self.last.outcome is DrillOutcome.NOT_DRILLABLE:
-            return "not drillable (irreversible by design)"
+            kind = self.last.declared_kind
+            why = (
+                "nothing to undo"
+                if kind is Reversibility.IDEMPOTENT
+                else f"{kind.value} by design"
+            )
+            return f"not drillable ({why})"
         if not self.last.outcome.is_proof:
             return f"last drill {self.last.outcome.value}"
         a = self.age(now=now) or 0.0
@@ -470,10 +644,11 @@ class RecoverabilityRegister:
                 ))
                 continue
             if entry.last is not None and entry.last.outcome is DrillOutcome.NOT_DRILLABLE:
-                continue   # irreversible by design: nothing to prove, ever
+                continue   # nothing to prove by design, ever
             if entry.last is not None and entry.last.outcome.is_alarm:
+                urgency = _ALARM_URGENCY.get(entry.last.outcome, "failing")
                 out.append(DrillDue(
-                    tool=tool, urgency="failing", priority=_URGENCY["failing"],
+                    tool=tool, urgency=urgency, priority=_URGENCY[urgency],
                     age_seconds=entry.age(now=when),
                     reason=f"last drill {entry.last.outcome.value}: {entry.last.summary[:80]}",
                 ))
@@ -512,12 +687,18 @@ class RecoverabilityRegister:
             e for e in entries
             if e.last and e.last.outcome.is_proof and not e.is_proven(now=now)
         ]
+        by_urgency = Counter(
+            _ALARM_URGENCY.get(e.last.outcome, "failing") for e in alarming
+        )
         return {
             "stale_after_seconds": self.stale_after,
             "tools_tracked": len(entries),
             "proven": len(proven),
             "stale": len(stale),
             "alarming": len(alarming),
+            "failing": by_urgency["failing"],
+            "blocked": by_urgency["blocked"],
+            "untested": by_urgency["untested"],
             "proven_fraction": round(len(proven) / len(entries), 4) if entries else 0.0,
             "needs_attention": [e.to_dict(now=now) for e in alarming + stale],
             "tools": {e.tool: e.to_dict(now=now) for e in entries},
@@ -697,7 +878,31 @@ class DrillDue:
 # Lower sorts first. `failing` outranks `never_drilled` because a tool that was
 # proven and then broke is a live regression against something the organization is
 # actively relying on, whereas an undrilled tool is a known unknown.
-_URGENCY = {"failing": 0, "never_drilled": 1, "stale": 2, "ageing": 3}
+# The three alarm outcomes want three different people. A drill that ran and did
+# not restore is the spec's problem. One that could not run is a gate, a window or
+# a missing evaluator — the integration's problem. One whose forward action never
+# moved anything is the canary's problem, and chasing it in the spec finds nothing.
+# Collapsing them sends everyone to the wrong file.
+_ALARM_URGENCY = {
+    DrillOutcome.FAILED: "failing",
+    DrillOutcome.PARTIAL: "failing",
+    DrillOutcome.ERRORED: "failing",
+    DrillOutcome.UNAVAILABLE: "blocked",
+    DrillOutcome.FORWARD_FAILED: "untested",
+    DrillOutcome.FORWARD_NO_OP: "untested",
+}
+
+# `untested` outranks `never_drilled` because it is the same absence of evidence
+# wearing a passing coat: the suite ran, the tool appeared covered, and nothing was
+# learned. A known unknown is safer than one that reports green.
+_URGENCY = {
+    "failing": 0,
+    "blocked": 1,
+    "untested": 2,
+    "never_drilled": 3,
+    "stale": 4,
+    "ageing": 5,
+}
 
 
 def render_report(register: RecoverabilityRegister, *, now: float | None = None) -> str:
@@ -708,8 +913,15 @@ def render_report(register: RecoverabilityRegister, *, now: float | None = None)
         f"{rep['proven']}/{rep['tools_tracked']} tools have a rollback proven working "
         f"within {rep['stale_after_seconds'] / 3600:.0f}h"
     )
-    if rep["alarming"]:
-        lines.append(f"!! {rep['alarming']} tool(s) failing their drill")
+    if rep["failing"]:
+        lines.append(f"!! {rep['failing']} tool(s) whose inverse ran and did not restore")
+    if rep["blocked"]:
+        lines.append(f"!! {rep['blocked']} tool(s) whose undo could not run at all")
+    if rep["untested"]:
+        lines.append(
+            f"!! {rep['untested']} tool(s) whose drill never exercised the inverse "
+            f"— fix the canary, not the spec"
+        )
     if rep["stale"]:
         lines.append(f" * {rep['stale']} tool(s) proven once but now stale")
     lines.append("")
@@ -729,6 +941,8 @@ def render_report(register: RecoverabilityRegister, *, now: float | None = None)
 __all__ = [
     "Canary",
     "DrillDue",
+    "Exemption",
+    "StateEquivalence",
     "DrillOutcome",
     "DrillResult",
     "DrillRunner",
