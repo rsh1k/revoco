@@ -1,15 +1,15 @@
 {
-  "finished_at": 1788513579.6868212,
-  "id": "gh-08d35795",
+  "finished_at": 1788514228.735601,
+  "id": "gh-fdb461e0",
   "results": [
     {
-      "at": 1788513537.164173,
+      "at": 1788514182.6330492,
       "canary": "branch-delete",
       "collateral": [],
       "declared_kind": "reversible",
-      "duration_ms": 7087.58,
+      "duration_ms": 6384.02,
       "error": null,
-      "id": "drl_aba223920badf41d26b70618",
+      "id": "drl_4a2d7ff4da10f2eb610cbb17",
       "mismatches": [],
       "observed_residue": [],
       "outcome": "passed",
@@ -24,13 +24,13 @@
       "unrestored": []
     },
     {
-      "at": 1788513551.3332977,
+      "at": 1788514200.2675858,
       "canary": "pr-merge",
       "collateral": [],
       "declared_kind": "compensable",
-      "duration_ms": 18062.2,
+      "duration_ms": 17072.55,
       "error": null,
-      "id": "drl_5dc8db154644fb63ac5a27fc",
+      "id": "drl_87762c00552a1209f07203d5",
       "mismatches": [],
       "observed_residue": [
         "base_sha",
@@ -46,13 +46,13 @@
       "unrestored": []
     },
     {
-      "at": 1788513544.2517877,
+      "at": 1788514189.0173273,
       "canary": "ref-force-update",
       "collateral": [],
       "declared_kind": "reversible",
-      "duration_ms": 7081.48,
+      "duration_ms": 6169.9,
       "error": null,
-      "id": "drl_0a584c71aac9dcdb227c7a89",
+      "id": "drl_0add269bde1e4ccf88ec8740",
       "mismatches": [],
       "observed_residue": [],
       "outcome": "passed",
@@ -63,8 +63,28 @@
       "tool": "github.ref.force_update",
       "unavailable_reason": "",
       "unrestored": []
+    },
+    {
+      "at": 1788514195.1872869,
+      "canary": "branch-protection",
+      "collateral": [],
+      "declared_kind": "reversible",
+      "duration_ms": 5080.24,
+      "error": null,
+      "id": "drl_c5e21d6f868d1981d9d0aa04",
+      "mismatches": [],
+      "observed_residue": [],
+      "outcome": "passed",
+      "residue": "",
+      "restored": [
+        "allow_force_pushes",
+        "enforce_admins"
+      ],
+      "tool": "github.repo.update_branch_protection",
+      "unavailable_reason": "",
+      "unrestored": []
     }
   ],
-  "started_at": 1788513526.37217,
+  "started_at": 1788514169.5622342,
   "target": "github:rsh1k/revoco"
 }
