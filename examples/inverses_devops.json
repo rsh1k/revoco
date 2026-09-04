@@ -62,6 +62,7 @@
     {
       "arg_map": {
         "merge_commit_sha": "result.sha",
+        "number": "args.number",
         "owner": "args.owner",
         "repo": "args.repo"
       },
@@ -69,7 +70,7 @@
       "gates": [],
       "inverse_tool": "github.pr.revert",
       "kind": "compensable",
-      "notes": "The honest classification. Reverting is not un-merging, and on a protected branch it is not even the same operation as a force push back.",
+      "notes": "The honest classification. Reverting is not un-merging, and on a protected branch it is not even the same operation as a force push back.\n\n`number` is in the arg_map because the first drill against the live API could not run without it. The spec previously passed only owner, repo and the merge commit, which names what to undo and not where: a revert has to move a branch, and nothing in those three identifies which. Deriving it by searching for branches containing the merge commit would work until two branches contained it. Reverting *a pull request* is the operation, so the pull request is the argument.",
       "one_shot": false,
       "residue": "A revert adds a new commit rather than removing the merge, so history shows both. The merge event stands, and anything it triggered \u2014 a deployment, a release, a downstream consumer that already pulled \u2014 is not reverted with it.",
       "snapshot_fields": [],

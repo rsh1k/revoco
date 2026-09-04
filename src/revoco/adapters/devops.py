@@ -40,6 +40,7 @@ from __future__ import annotations
 
 from ..reversal.model import (
     PHASE_AUTHORIZE,
+    Exemption,
     InverseSpec,
     InverseStep,
     ReversalGate,
@@ -52,21 +53,45 @@ from ..reversal.registry import InverseRegistry
 # Gates
 # ---------------------------------------------------------------------------
 
-# Nothing is exempt on this surface, and that is a measured result rather than
-# an omission.
+# Two exemptions, both measured against the live API, and one removed for the
+# same reason.
 #
-# The first version of this relation excused `node_id`, reasoning that GitHub
-# would mint a fresh one when a ref is recreated and that a correctly restored
-# branch could therefore never match on it. The drill's own residue reporting
-# showed the exemption never firing, and probing it directly showed why: a ref's
+# Removed: `node_id`. The first version of this relation excused it, reasoning
+# that GitHub mints a fresh one when a ref is recreated. The drill's residue
+# reporting showed the exemption never firing, and a probe showed why — a ref's
 # node_id is a base64 encoding of the ref *path*, identical before a delete and
-# after a recreate at the same SHA. The exemption was excusing a difference that
-# does not occur.
+# after a recreate at the same SHA. It excused a difference that does not occur,
+# and an entry excusing nothing today is one nobody re-examines when it starts
+# excusing something.
 #
-# It is removed rather than left harmless. An ignore-set is the one knob that can
-# tune a comparison until it cannot fail, and an entry that excuses nothing today
-# is an entry nobody will re-examine when it starts excusing something.
-DEVOPS_EQUIVALENCE = StateEquivalence(name="devops")
+# The two below are the opposite case: the residue prose on `github.pr.merge`
+# predicted them, and drilling the merge confirmed both. `base_tree` came back
+# and these did not.
+DEVOPS_EQUIVALENCE = StateEquivalence(
+    name="devops",
+    exempt=(
+        Exemption(
+            field="base_sha",
+            reason=(
+                "Reverting a merge adds a commit rather than removing one, so the "
+                "branch tip is necessarily a new SHA. Measured: after revert the "
+                "tree matched the pre-merge tree and the tip did not. Requiring "
+                "the tip to return would be requiring history to be rewritten, "
+                "which is the operation this spec is classified COMPENSABLE for "
+                "not doing."
+            ),
+        ),
+        Exemption(
+            field="pr_state",
+            reason=(
+                "A merged pull request stays merged. Reverting its effect does "
+                "not reopen it, and GitHub offers no transition back. Measured: "
+                "state was 'closed' before the drill and after it. The merge "
+                "event standing is the residue the spec already names."
+            ),
+        ),
+    ),
+)
 
 
 GATE_GIT_OBJECTS_PRESENT = ReversalGate(
@@ -178,6 +203,7 @@ DEVOPS_SPECS: list[InverseSpec] = [
         arg_map=(
             ("owner", "args.owner"),
             ("repo", "args.repo"),
+            ("number", "args.number"),
             ("merge_commit_sha", "result.sha"),
         ),
         residue=(
@@ -189,6 +215,14 @@ DEVOPS_SPECS: list[InverseSpec] = [
         notes=(
             "The honest classification. Reverting is not un-merging, and on a "
             "protected branch it is not even the same operation as a force push back."
+            "\n\n"
+            "`number` is in the arg_map because the first drill against the live "
+            "API could not run without it. The spec previously passed only owner, "
+            "repo and the merge commit, which names what to undo and not where: "
+            "a revert has to move a branch, and nothing in those three identifies "
+            "which. Deriving it by searching for branches containing the merge "
+            "commit would work until two branches contained it. Reverting *a pull "
+            "request* is the operation, so the pull request is the argument."
         ),
     ),
     InverseSpec(

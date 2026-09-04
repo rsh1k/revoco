@@ -69,6 +69,7 @@ class GitHub:
     def __init__(self, owner: str, repo: str, run_id: str) -> None:
         self.owner, self.repo, self.run_id = owner, repo, run_id
         self.created: list[str] = []
+        self.prs: list[int] = []
 
     # -- plumbing -----------------------------------------------------------
     def _api(self, *args: str, check: bool = True) -> Any:
@@ -127,9 +128,20 @@ class GitHub:
         self.created.append(name)
         return name
 
+    def open_pr(self, head: str, base: str) -> int:
+        got = self._api("-X", "POST", f"repos/{self.owner}/{self.repo}/pulls",
+                        "-f", f"title=revoco canary {self.run_id}",
+                        "-f", f"head={head}", "-f", f"base={base}",
+                        "-f", "body=Opened and closed by a control-validation drill.")
+        self.prs.append(got["number"])
+        return int(got["number"])
+
     def sweep(self) -> list[str]:
         """Remove every canary this run created. Returns what survived."""
         stuck = []
+        for number in list(self.prs):
+            self._api("-X", "PATCH", f"repos/{self.owner}/{self.repo}/pulls/{number}",
+                      "-f", "state=closed", check=False)
         for name in list(self.created):
             self._api("-X", "DELETE",
                       f"repos/{self.owner}/{self.repo}/git/refs/heads/{name}",
@@ -156,6 +168,35 @@ class GitHub:
                       f"repos/{self.owner}/{self.repo}/git/refs/heads/{name}",
                       "-f", f"sha={args['sha']}", "-F", "force=true")
             return {"ref": name, "sha": args["sha"]}
+        if tool == "github.pr.merge":
+            got = self._api("-X", "PUT",
+                            f"repos/{self.owner}/{self.repo}/pulls/"
+                            f"{args['number']}/merge",
+                            "-f", "merge_method=merge")
+            return {"sha": got["sha"], "merged": got["merged"]}
+        if tool == "github.pr.revert":
+            # GitHub's REST API has no revert endpoint — the UI builds one out of
+            # a branch and a second pull request. Done here with the git data
+            # API: a new commit on the base whose tree is the pre-merge tree,
+            # parented on the merge. That is what `git revert -m 1` produces, and
+            # doing it in one commit keeps the drill measuring the spec rather
+            # than a workflow built on top of it.
+            pr = self._api(f"repos/{self.owner}/{self.repo}/pulls/{args['number']}")
+            base = self._guard(pr["base"]["ref"])
+            head_sha = self.ref_sha(base)
+            merge = self._api(f"repos/{self.owner}/{self.repo}/git/commits/"
+                              f"{args['merge_commit_sha']}")
+            pre_merge = merge["parents"][0]["sha"]
+            pre_tree = self._api(f"repos/{self.owner}/{self.repo}/git/commits/"
+                                 f"{pre_merge}")["tree"]["sha"]
+            rev = self._api("-X", "POST",
+                            f"repos/{self.owner}/{self.repo}/git/commits",
+                            "-f", f"message=Revert merge {args['merge_commit_sha'][:7]}",
+                            "-f", f"tree={pre_tree}", "-f", f"parents[]={head_sha}")
+            self._api("-X", "PATCH",
+                      f"repos/{self.owner}/{self.repo}/git/refs/heads/{base}",
+                      "-f", f"sha={rev['sha']}")
+            return {"sha": rev["sha"], "restored_tree": pre_tree}
         raise GitHubApiError(f"no executor for {tool}")
 
     def read_state(self, tool: str, args: dict[str, Any],
@@ -191,6 +232,26 @@ def build_canaries(gh: GitHub, base_sha: str, second_sha: str) -> list[Canary]:
     delete_ref = gh.make_canary_ref("delete-me", base_sha)
     force_ref = gh.make_canary_ref("force-me", base_sha)
 
+    # The pull request drill merges into a canary base, never the repository's
+    # default branch. A ref guard does not help here — a merge names a base
+    # branch rather than a ref to write — so the isolation has to come from
+    # choosing the base.
+    pr_base = gh.make_canary_ref("pr-base", base_sha)
+    pr_head = gh.make_canary_ref("pr-head", second_sha)
+    pr_number = gh.open_pr(pr_head, pr_base)
+
+    def pr_state() -> dict[str, Any]:
+        name = pr_base
+        ref = gh._api(f"repos/{gh.owner}/{gh.repo}/git/ref/heads/{name}",
+                      check=False)
+        tip = ref["object"]["sha"] if ref else None
+        tree = None
+        if tip:
+            tree = gh._api(f"repos/{gh.owner}/{gh.repo}/git/commits/{tip}")["tree"]["sha"]
+        pr = gh._api(f"repos/{gh.owner}/{gh.repo}/pulls/{pr_number}", check=False)
+        return {"base_tree": tree, "base_sha": tip,
+                "pr_state": pr["state"] if pr else None}
+
     return [
         Canary(tool="github.branch.delete",
                args={"owner": gh.owner, "repo": gh.repo, "ref": delete_ref},
@@ -200,6 +261,10 @@ def build_canaries(gh: GitHub, base_sha: str, second_sha: str) -> list[Canary]:
                args={"owner": gh.owner, "repo": gh.repo, "ref": force_ref,
                      "sha": second_sha, "force": True},
                verify=verify(force_ref), label="ref-force-update",
+               equivalence=DEVOPS_EQUIVALENCE),
+        Canary(tool="github.pr.merge",
+               args={"owner": gh.owner, "repo": gh.repo, "number": pr_number},
+               verify=pr_state, label="pr-merge",
                equivalence=DEVOPS_EQUIVALENCE),
     ]
 
