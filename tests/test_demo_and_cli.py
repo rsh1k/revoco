@@ -172,6 +172,33 @@ def test_validation_report_exits_nonzero_only_when_something_got_worse(tmp_path,
     assert main(["validation-report", str(base), "--previous", str(base)]) == 0
 
 
+def test_a_comparison_that_could_not_be_made_is_a_different_exit_code(tmp_path, capsys):
+    """Three outcomes, not two.
+
+    A scheduler that cannot tell "a control regressed" from "the comparison never
+    happened" reads a broken runner as a healthy estate the moment nobody is
+    reading the log — the same absence-looking-like-success the change taxonomy
+    refuses. 0 nothing worse, 1 something did, 2 the check could not be made.
+    """
+    from revoco.drills import DrillOutcome as D
+
+    a = tmp_path / "a.json"
+    b = tmp_path / "b.json"
+    _write_run(a, [_drill("t", D.PASSED)], target="tenant-a", rid="r1")
+    _write_run(b, [_drill("t", D.PASSED, at=2000.0)], target="tenant-b",
+               rid="r2", at=2000.0)
+
+    assert main(["validation-report", str(b), "--previous", str(a)]) == 2
+    assert "cannot compare" in capsys.readouterr().err
+
+    assert main(["validation-report", str(tmp_path / "nope.json")]) == 2
+    assert "cannot compare" in capsys.readouterr().err
+
+    malformed = tmp_path / "bad.json"
+    malformed.write_text("{not json")
+    assert main(["validation-report", str(malformed)]) == 2
+
+
 def test_an_unsigned_report_says_so_rather_than_signing_with_a_throwaway_key(
         tmp_path, capsys):
     """A signature from an ephemeral key verifies against nothing anyone knows.

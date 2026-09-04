@@ -1,0 +1,72 @@
+name: assurance
+
+# The assurance loop, on a schedule. Drills the GitHub inverse specs against the
+# live API and compares the result to a committed baseline.
+#
+# This is not CI. CI asks whether the code is correct; this asks whether a
+# specification written from vendor documentation still describes the API it
+# claims to reverse. An upstream change that breaks an undo path does not touch
+# this repository and would never fail a build.
+
+on:
+  schedule:
+    # Nightly, off the hour. Scheduled runs are queued, not punctual.
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+# Creating and destroying canary refs needs write. The token is scoped to this
+# repository and expires with the job, which is the reason the drills run here
+# rather than against a separate sandbox that would require a stored PAT.
+permissions:
+  contents: write
+
+concurrency:
+  group: assurance
+  cancel-in-progress: false
+
+jobs:
+  github-refs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install
+        run: uv sync --extra dev --extra yaml
+
+      - name: Drill the GitHub ref specs against the live API
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          uv run python scripts/drill_github.py \
+            --repo "${{ github.repository }}" \
+            --run-out run.json
+
+      - name: Compare against the committed baseline
+        run: |
+          uv run revoco validation-report run.json \
+            --previous assurance/github-baseline.json
+
+      # Kept whatever the outcome. A failed run is the one whose evidence
+      # someone will want, and it is the run that does not get re-created.
+      - name: Keep the run
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: validation-run-${{ github.run_id }}
+          path: run.json
+          retention-days: 90
+
+      - name: Report a leaked canary as a failure of its own
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          echo "Checking for canary refs the teardown could not remove."
+          gh api "repos/${{ github.repository }}/git/refs/heads" \
+            --jq '.[].ref' | grep 'revoco-canary' \
+            && { echo "::error::canary refs left behind — remove them by hand"; exit 1; } \
+            || echo "none left behind"
