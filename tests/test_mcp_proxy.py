@@ -175,3 +175,95 @@ def test_a_response_to_something_never_gated_is_ignored(monkeypatch):
 def test_a_proxy_with_nowhere_to_forward_is_refused_at_construction():
     with pytest.raises(ValueError):
         McpProxy(None, None, [])  # type: ignore[arg-type]
+
+
+# ---- shutdown: the outcome the proxy cannot resolve ------------------------
+
+class FakeProc:
+    """Enough of Popen for the shutdown path, with a controllable wait."""
+
+    def __init__(self, *, hangs: bool = False) -> None:
+        self.stdin = io.BytesIO()
+        self.stdout = io.BytesIO()
+        self.returncode = 0
+        self.hangs = hangs
+        self.waits = 0
+        self.killed = False
+
+    def wait(self, timeout=None):
+        self.waits += 1
+        if self.hangs and timeout is not None:
+            import subprocess
+            raise subprocess.TimeoutExpired(cmd="fake", timeout=timeout)
+        return 0
+
+    def kill(self):
+        self.killed = True
+        self.hangs = False      # a killed process stops hanging
+
+
+def test_a_call_left_unanswered_at_shutdown_is_reported_not_just_logged_away(
+        monkeypatch):
+    """The one outcome the proxy cannot resolve.
+
+    The call was authorized and forwarded. Its journal entry is still PLANNED,
+    so closing it loses no undo path — but there is no basis for saying the
+    action did not happen either. The response may have gone with the session
+    and the tool may have done exactly what it was asked. An action that may
+    have landed with no undo recorded is what an operator has to be told.
+    """
+    proxy, cp, up, _replies = _proxy(monkeypatch)
+    proxy._proc = FakeProc()
+    proxy._on_client_line(_call("invoices.pay", {"invoice_id": "INV-1", "amount": 900}), up)
+    assert proxy._pending
+
+    proxy._shutdown()
+
+    assert proxy.stranded == ("invoices.pay",)
+    assert proxy._pending == {}
+    states = {e.state.value for e in cp.reversal.entries()}
+    assert "abandoned" in states
+    assert "committed" not in states
+
+
+def test_the_abandon_reason_does_not_claim_the_action_did_not_happen(monkeypatch):
+    """An earlier version asserted "it never completed", which the code cannot
+    know. The reason is the thing a responder reads months later; it must not
+    state a fact that was never established."""
+    proxy, cp, up, _replies = _proxy(monkeypatch)
+    proxy._proc = FakeProc()
+    proxy._on_client_line(_call("invoices.pay", {"invoice_id": "INV-1", "amount": 900}), up)
+    proxy._shutdown()
+
+    note = " ".join(str(e.to_dict()) for e in cp.reversal.entries())
+    assert "unknown" in note
+    assert "never completed" not in note
+
+
+def test_a_clean_session_strands_nothing(monkeypatch):
+    proxy, _cp, up, _replies = _proxy(monkeypatch)
+    proxy._proc = FakeProc()
+    proxy._on_client_line(_call("invoices.pay", {"invoice_id": "INV-1", "amount": 900}), up)
+    proxy._on_upstream_line(json.dumps({"jsonrpc": "2.0", "id": 1, "result": {}}))
+    proxy._shutdown()
+    assert proxy.stranded == ()
+
+
+def test_a_hung_upstream_is_killed_and_reaped(monkeypatch):
+    """A killed child that is never waited on stays a zombie for as long as the
+    host process lives, which for a long-running proxy is the rest of the day."""
+    proxy, _cp, _up, _replies = _proxy(monkeypatch)
+    proxy._proc = FakeProc(hangs=True)
+    proxy._shutdown()
+    assert proxy._proc.killed
+    assert proxy._proc.waits == 2, "kill must be followed by a wait that reaps it"
+
+
+def test_shutdown_before_anything_started_does_not_explode(monkeypatch):
+    """`_shutdown` used a bare assert, which `python -O` strips — turning a
+    guarded early return into an AttributeError in exactly the deployment most
+    likely to run optimised."""
+    proxy, _cp, _up, _replies = _proxy(monkeypatch)
+    assert proxy._proc is None
+    proxy._shutdown()
+    assert proxy.stranded == ()

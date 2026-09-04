@@ -104,6 +104,9 @@ class McpProxy:
 
         self._proc: subprocess.Popen[bytes] | None = None
         self._pending: dict[Any, Verdict] = {}
+        # Tools whose calls were never answered, set at shutdown. Readable so a
+        # supervisor can act on it rather than having to scrape the log.
+        self.stranded: tuple[str, ...] = ()
         self._lock = threading.Lock()
 
     # -- lifecycle ----------------------------------------------------------
@@ -129,23 +132,50 @@ class McpProxy:
         return self._proc.returncode or 0
 
     def _shutdown(self) -> None:
-        assert self._proc
+        if self._proc is None:
+            return
         try:
             if self._proc.stdin:
                 self._proc.stdin.close()
         except OSError:
             pass
-        # Anything still pending never got a response, so it never completed.
-        # Leaving those journal entries open would claim a live undo path for
-        # actions whose outcome nobody knows.
+
+        # A pending call is one that was authorized, forwarded, and never
+        # answered. Its journal entry is still PLANNED, so there is no undo path
+        # to lose by closing it — but there is no basis for saying the action did
+        # not happen either. The response may simply have gone with the session,
+        # and the tool may have done exactly what it was asked to.
+        #
+        # So this is the one outcome the proxy cannot resolve, and the only
+        # correct response is to say so loudly. An action that may have landed
+        # with no undo recorded against it is precisely what an operator has to
+        # be told, and it is invisible in a journal that merely shows an
+        # abandoned entry.
         with self._lock:
             stranded, self._pending = list(self._pending.values()), {}
+        self.stranded = tuple(v.tool for v in stranded)
         for verdict in stranded:
-            self._abandon(verdict, "session ended before upstream responded")
+            self._abandon(
+                verdict,
+                "session ended before upstream answered; the outcome of this call "
+                "is unknown and it may have taken effect",
+            )
+        if stranded:
+            log.warning(
+                "session ended with %d call(s) unanswered: %s. Each was authorized "
+                "and forwarded, and whether it took effect is unknown. If it did, "
+                "no undo was recorded for it.",
+                len(stranded), ", ".join(sorted(self.stranded)),
+            )
+
         try:
             self._proc.wait(timeout=5)
         except subprocess.TimeoutExpired:
             self._proc.kill()
+            # Reap it. A killed child that is never waited on stays a zombie for
+            # as long as this process lives, which for a long-running proxy host
+            # is the rest of the day.
+            self._proc.wait()
 
     # -- client -> upstream -------------------------------------------------
     def _on_client_line(self, line: str, upstream: IO[bytes]) -> None:
