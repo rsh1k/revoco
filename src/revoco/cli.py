@@ -343,6 +343,47 @@ def _cmd_surfaces(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_validation_report(args: argparse.Namespace) -> int:
+    """Compare a validation run against a baseline and report what moved."""
+    from pathlib import Path
+
+    from .core import crypto
+    from .validation import ValidationRun, render, report
+
+    def _load(path: str) -> ValidationRun:
+        return ValidationRun.from_dict(json.loads(Path(path).read_text()))
+
+    current = _load(args.run)
+    previous = _load(args.previous) if args.previous else None
+
+    if args.signing_key:
+        signer_key = crypto.private_key_from_b64(
+            Path(args.signing_key).read_text().strip())
+        signer_id = args.signer or "unnamed-signer"
+    else:
+        # An ephemeral key would produce a signature nobody can check against a
+        # known signer, which is decoration rather than evidence. Say it is
+        # unsigned instead.
+        signer_key, _ = crypto.generate_keypair()
+        signer_id = "UNSIGNED"
+
+    rep = report(current, previous=previous,
+                 signer_private_key=signer_key, signer_id=signer_id)
+
+    if args.json:
+        print(json.dumps(rep.to_dict(), indent=2, sort_keys=True))
+    else:
+        print(render(rep))
+        if signer_id == "UNSIGNED":
+            print("\nNOT SIGNED — pass --signing-key to produce evidence a third "
+                  "party can verify.")
+
+    # Exit non-zero when something got worse, so a scheduler notices without
+    # anyone reading the output. A standing failure that has not moved is not a
+    # new incident and does not fail the run.
+    return 1 if not rep.clean else 0
+
+
 def _cmd_demo(args: argparse.Namespace) -> int:
     from .demo import run_demo
 
@@ -397,6 +438,19 @@ def build_parser() -> argparse.ArgumentParser:
     sf.add_argument("--surface", action="append", help="restrict --gates to a surface")
     sf.add_argument("--json", action="store_true")
     sf.set_defaults(func=_cmd_surfaces)
+
+    vr = sub.add_parser(
+        "validation-report",
+        help="compare a validation run against a baseline and report what moved")
+    vr.add_argument("run", help="the run to report on (JSON)")
+    vr.add_argument("--previous", metavar="PATH",
+                    help="the baseline to compare against; without one this is a "
+                         "baseline and cannot show a regression")
+    vr.add_argument("--signing-key", metavar="PATH",
+                    help="base64 Ed25519 private key; unsigned without it")
+    vr.add_argument("--signer", metavar="ID", help="who the signature belongs to")
+    vr.add_argument("--json", action="store_true")
+    vr.set_defaults(func=_cmd_validation_report)
 
     ct = sub.add_parser("controls", help="print the control mapping")
     ct.add_argument("--json", action="store_true")

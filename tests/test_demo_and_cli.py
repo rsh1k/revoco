@@ -126,3 +126,76 @@ def test_the_missing_equivalence_surfaces_are_named_rather_than_just_counted(cap
 def test_an_unknown_surface_is_refused_rather_than_reported_as_having_none():
     with pytest.raises(KeyError):
         equivalence("nosuchsurface")
+
+
+def _write_run(path, results, target="t", rid="r", at=1000.0):
+    from revoco.validation import ValidationRun
+    run = ValidationRun(id=rid, target=target, started_at=at,
+                        finished_at=at + 1, results=tuple(results))
+    path.write_text(json.dumps(run.payload()))
+    return run
+
+
+def _drill(tool, outcome, at=1000.0):
+    from revoco.drills import DrillResult
+    from revoco.reversal import Reversibility
+    return DrillResult(id=f"d-{tool}-{at}", tool=tool, outcome=outcome,
+                       declared_kind=Reversibility.REVERSIBLE, at=at, duration_ms=1.0)
+
+
+def test_validation_report_exits_nonzero_only_when_something_got_worse(tmp_path, capsys):
+    """A scheduler keys on the exit code, not the prose. A standing failure that
+    has not moved is a status, and failing the run on it every night is how the
+    alert gets muted."""
+    from revoco.drills import DrillOutcome as D
+
+    base = tmp_path / "base.json"
+    worse = tmp_path / "worse.json"
+    _write_run(base, [_drill("t", D.PASSED)], rid="r1")
+    _write_run(worse, [_drill("t", D.FAILED, at=2000.0)], rid="r2", at=2000.0)
+
+    assert main(["validation-report", str(worse), "--previous", str(base)]) == 1
+    assert "REGRESSED" in capsys.readouterr().out
+
+    assert main(["validation-report", str(base), "--previous", str(base)]) == 0
+
+
+def test_an_unsigned_report_says_so_rather_than_signing_with_a_throwaway_key(
+        tmp_path, capsys):
+    """A signature from an ephemeral key verifies against nothing anyone knows.
+    That is decoration presented as evidence, which is worse than no signature."""
+    from revoco.drills import DrillOutcome as D
+
+    run = tmp_path / "run.json"
+    _write_run(run, [_drill("t", D.PASSED)])
+    assert main(["validation-report", str(run)]) == 0
+    out = capsys.readouterr().out
+    assert "NOT SIGNED" in out
+    assert "UNSIGNED" in out
+
+
+def test_a_signed_report_verifies_for_someone_holding_only_the_public_key(
+        tmp_path, capsys):
+    """The whole point of the artefact: an auditor who distrusts the operator can
+    check it without access to anything the operator controls."""
+    from revoco.core import crypto
+    from revoco.drills import DrillOutcome as D
+    from revoco.validation import Change, ControlChange, ValidationReport, ValidationRun
+
+    priv, pub = crypto.generate_keypair()
+    key = tmp_path / "k"
+    key.write_text(crypto.private_key_to_b64(priv))
+    run = tmp_path / "run.json"
+    _write_run(run, [_drill("t", D.PASSED)])
+
+    assert main(["validation-report", str(run), "--signing-key", str(key),
+                 "--signer", "ci", "--json"]) == 0
+    d = json.loads(capsys.readouterr().out)
+
+    rebuilt = ValidationReport(
+        id=d["id"], run=ValidationRun.from_dict(d["run"]),
+        previous_id=d["previous_id"], previous_digest=d["previous_digest"],
+        changes=tuple(ControlChange(c["tool"], Change(c["change"]), c["now"],
+                                    c["before"], c["detail"]) for c in d["changes"]),
+        signer_id=d["signer_id"], signed_at=d["signed_at"], signature=d["signature"])
+    assert rebuilt.verify_signature(pub)
