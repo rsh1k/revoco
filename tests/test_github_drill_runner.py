@@ -135,14 +135,39 @@ def test_a_clean_sweep_reports_nothing(monkeypatch):
 
 # ---- the relation ----------------------------------------------------------
 
-def test_the_devops_surface_exempts_nothing():
-    """Measured, not omitted. An earlier version excused `node_id` on the
-    reasoning that a recreated ref gets a fresh one; a ref's node_id is a base64
-    encoding of the ref path and is identical after a recreate at the same SHA.
-    Asserting the empty set keeps that from being quietly re-added."""
+def test_the_devops_relation_exempts_exactly_what_was_measured():
+    """Every exemption on this surface was earned by a drill, and the set is
+    asserted whole so a new one cannot be added without editing this."""
     from revoco.adapters import EQUIVALENCES
 
     eq = EQUIVALENCES["devops"]
     assert eq is not None
-    assert eq.fields == frozenset()
-    assert "must return exactly" in eq.describe()
+    assert eq.fields == {"base_sha", "pr_state"}
+    for e in eq.exempt:
+        assert "Measured" in e.reason, f"{e.field}: an exemption needs evidence"
+
+
+def test_node_id_is_not_exempt():
+    """It was, on the reasoning that a recreated ref gets a fresh one. A ref's
+    node_id is a base64 encoding of the ref path and is identical after a
+    recreate at the same SHA, so the exemption excused nothing. This keeps it
+    from being quietly re-added."""
+    from revoco.adapters import EQUIVALENCES
+
+    assert "node_id" not in EQUIVALENCES["devops"].fields
+
+
+def test_the_revert_inverse_is_given_enough_to_locate_the_branch():
+    """The first live drill failed here. `github.pr.revert(owner, repo,
+    merge_commit_sha)` names what to undo and not where — a revert moves a
+    branch, and nothing in those three says which. The pull request number is
+    the argument that answers it."""
+    from revoco.adapters.devops import DEVOPS_SPECS
+
+    spec = next(s for s in DEVOPS_SPECS if s.tool == "github.pr.merge")
+    mapped = dict(spec.arg_map)
+    assert "number" in mapped
+    assert mapped["merge_commit_sha"] == "result.sha", (
+        "the merge SHA is only knowable from the response, which is why the "
+        "proxy confirms on the response rather than on the forward call"
+    )

@@ -8,9 +8,9 @@
 python scripts/validate_workstation.py
 ```
 
-`devops` is **partially validated**: the two GitHub ref specs — `github.branch.delete`
-and `github.ref.force_update` — are drilled against the live GitHub API by
-`scripts/drill_github.py`, under a relation that exempts nothing. The Kubernetes
+`devops` is **partially validated**: three GitHub specs — `github.branch.delete`,
+`github.ref.force_update` and `github.pr.merge` — are drilled against the live
+GitHub API by `scripts/drill_github.py`. The Kubernetes
 and feature-flag specs on that surface are not.
 
 The other six surfaces are **specification, not validated integration.**
@@ -319,7 +319,7 @@ A spec that declares gates and runs without an evaluator refuses to execute, and
 
 ## What validating one surface actually taught us
 
-`scripts/validate_workstation.py` drills all 10 drillable inverses against a real filesystem and a real `git init` repo, then probes the prose claims the classifications rest on. It found seven things, and every one of them is a pattern that will recur on the surfaces still unvalidated.
+`scripts/validate_workstation.py` drills all 10 drillable inverses against a real filesystem and a real `git init` repo, then probes the prose claims the classifications rest on. It found nine things, and every one of them is a pattern that will recur on the surfaces still unvalidated.
 
 **1. A snapshot field that looks right can produce an undo that succeeds and leaves you somewhere else.** `git.checkout`'s inverse restores `snapshot.head_ref`. The first integration captured that as `git symbolic-ref HEAD` — `refs/heads/main` — and feeding a full ref path to `git checkout` **detaches HEAD** instead of switching to the branch. The inverse returned success. State was materially different. Nothing but a state comparison catches that, which is the entire argument for drills over health checks.
 
@@ -335,6 +335,10 @@ A spec that declares gates and runs without an evaluator refuses to execute, and
 
 **7. An exemption written from reasoning excused a difference that does not occur.** The first state-equivalence relation for `devops` excused `node_id`, on the reasoning that GitHub would mint a fresh one when a ref is recreated and a correctly restored branch could therefore never match on it. It sounded right and it was wrong: a ref's node_id is a base64 encoding of the ref *path*, identical before a delete and after a recreate at the same SHA. The drill's own residue reporting gave it away by never firing, and a direct probe confirmed it. The exemption was removed rather than left as a harmless no-op, because an ignore-set is the one knob that can tune a comparison until it cannot fail, and an entry excusing nothing today is an entry nobody re-examines when it starts excusing something. **This is finding 3 again, one layer up: the residue prose was written from documentation, and so was the exemption.**
 
+**8. An inverse can be specified with too few arguments to run.** `github.pr.merge` mapped its inverse as `github.pr.revert(owner, repo, merge_commit_sha)`. That names *what* to undo and not *where*: a revert has to move a branch, and nothing in those three identifies which one. The spec had never been executed, so nothing had ever needed the answer. The first live drill failed with a missing argument before it reached the API. Deriving the branch by searching for refs containing the merge commit would work until two branches contained it, so the pull request number is now an argument — reverting *a pull request* is the operation, so the pull request is the input. **This is the same defect class as the `k8s.resource.delete` arg_map drift in finding 6, and it is the one a drill finds instantly and a review never does.**
+
+**9. Residue prose, confirmed rather than corrected.** Finding 3 was residue written from documentation that turned out wrong. `github.pr.merge` is the opposite: its prose said a revert adds a commit rather than removing the merge, so history shows both and the merge event stands. Drilling it measured exactly that — `base_tree` returned, `base_sha` and `pr_state` did not. The two exemptions on the `devops` relation are those two fields, and their reasons cite the measurement rather than the documentation. A residue claim is not suspect because it came from a vendor document; it is suspect until something has executed it.
+
 ### What this means for the other six surfaces
 
 The failure modes above are not filesystem-specific. Expect the same shapes in SAP and Workday:
@@ -345,4 +349,4 @@ The failure modes above are not filesystem-specific. Expect the same shapes in S
 - gates that no evaluator answers, silently shrinking what a drill actually covers (finding 5)
 - canaries that do not actually move the state they claim to test — a reset with nothing to reset, a posting into a period that rejects it silently — so the drill passes without ever exercising the inverse (finding 6, the only one that fails green)
 
-Which is the argument for validating the cheap surface first: none of these seven needed an ERP sandbox to find, and all seven would have cost far more to discover there.
+Which is the argument for validating the cheap surface first: none of these nine needed an ERP sandbox to find, and all nine would have cost far more to discover there.

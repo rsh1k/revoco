@@ -1,15 +1,15 @@
 {
-  "finished_at": 1788512749.5025265,
-  "id": "gh-226f68d0",
+  "finished_at": 1788513579.6868212,
+  "id": "gh-08d35795",
   "results": [
     {
-      "at": 1788512727.5646148,
+      "at": 1788513537.164173,
       "canary": "branch-delete",
       "collateral": [],
       "declared_kind": "reversible",
-      "duration_ms": 7418.38,
+      "duration_ms": 7087.58,
       "error": null,
-      "id": "drl_12297c437766554680aa72f0",
+      "id": "drl_aba223920badf41d26b70618",
       "mismatches": [],
       "observed_residue": [],
       "outcome": "passed",
@@ -24,13 +24,35 @@
       "unrestored": []
     },
     {
-      "at": 1788512734.9830549,
+      "at": 1788513551.3332977,
+      "canary": "pr-merge",
+      "collateral": [],
+      "declared_kind": "compensable",
+      "duration_ms": 18062.2,
+      "error": null,
+      "id": "drl_5dc8db154644fb63ac5a27fc",
+      "mismatches": [],
+      "observed_residue": [
+        "base_sha",
+        "pr_state"
+      ],
+      "outcome": "passed",
+      "residue": "A revert adds a new commit rather than removing the merge, so history shows both. The merge event stands, and anything it triggered \u2014 a deployment, a release, a downstream consumer that already pulled \u2014 is not reverted with it.",
+      "restored": [
+        "base_tree"
+      ],
+      "tool": "github.pr.merge",
+      "unavailable_reason": "",
+      "unrestored": []
+    },
+    {
+      "at": 1788513544.2517877,
       "canary": "ref-force-update",
       "collateral": [],
       "declared_kind": "reversible",
-      "duration_ms": 9123.23,
+      "duration_ms": 7081.48,
       "error": null,
-      "id": "drl_29c2175d21db3e3778e2783e",
+      "id": "drl_0a584c71aac9dcdb227c7a89",
       "mismatches": [],
       "observed_residue": [],
       "outcome": "passed",
@@ -43,6 +65,6 @@
       "unrestored": []
     }
   ],
-  "started_at": 1788512719.9615667,
+  "started_at": 1788513526.37217,
   "target": "github:rsh1k/revoco"
 }
