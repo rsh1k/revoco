@@ -37,6 +37,7 @@ import time
 from dataclasses import dataclass, field
 from typing import Any
 
+from ..core.errors import ValidationError
 from .model import JournalEntry, JournalState, Reversibility
 
 DEFAULT_WARN_WITHIN = 3600.0  # an hour: enough to page someone and act
@@ -63,6 +64,25 @@ class HorizonEntry:
     @property
     def has_deadline(self) -> bool:
         return self.expires_at is not None
+
+    @classmethod
+    def from_dict(cls, d: dict[str, Any]) -> HorizonEntry:
+        try:
+            return cls(
+                journal_id=d["journal_id"], action_id=d.get("action_id"),
+                tool=d["tool"], kind=Reversibility(d["kind"]),
+                session_id=d.get("session_id", ""),
+                delegation_id=d.get("delegation_id"),
+                committed_at=d.get("committed_at"),
+                expires_at=d.get("expires_at"),
+                seconds_remaining=d.get("seconds_remaining"),
+                one_shot=bool(d.get("one_shot", False)),
+                residue=d.get("residue", ""),
+                gates=tuple(d.get("gates") or ()),
+                reason=d.get("reason", ""),
+            )
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ValidationError(f"malformed HorizonEntry: {exc}") from None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -141,6 +161,32 @@ class Horizon:
     def recoverable_fraction(self) -> float:
         total = self.undoable_count + self.unrecoverable_count
         return self.undoable_count / total if total else 1.0
+
+    @classmethod
+    def from_dict(cls, d: dict[str, Any]) -> Horizon:
+        """Read a horizon back.
+
+        The reason to serialize one is to look at it somewhere other than where
+        it was taken — a console, an evidence pack, an incident review a week
+        later. ``at`` is preserved rather than recomputed, because a snapshot
+        that silently re-dates itself on being opened is not a snapshot.
+        """
+        try:
+            def bucket(name: str) -> tuple[HorizonEntry, ...]:
+                return tuple(HorizonEntry.from_dict(e) for e in d.get(name) or ())
+
+            return cls(
+                at=float(d["at"]),
+                warn_within=float(d.get("warn_within", DEFAULT_WARN_WITHIN)),
+                closing=bucket("closing"),
+                open_indefinitely=bucket("open_indefinitely"),
+                expired=bucket("expired"),
+                standing_exposure=bucket("standing_exposure"),
+                broken=bucket("broken"),
+                notes=list(d.get("notes") or ()),
+            )
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ValidationError(f"malformed Horizon: {exc}") from None
 
     def to_dict(self) -> dict[str, Any]:
         return {

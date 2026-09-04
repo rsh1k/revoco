@@ -396,6 +396,32 @@ def _cmd_validation_report(args: argparse.Namespace) -> int:
     return 1 if not rep.clean else 0
 
 
+def _cmd_horizon(args: argparse.Namespace) -> int:
+    """Render a saved horizon as a page, or as text."""
+    from pathlib import Path
+
+    from .console import render_html
+    from .reversal.horizon import Horizon, render
+
+    try:
+        horizon = Horizon.from_dict(json.loads(Path(args.horizon).read_text()))
+    except (RevocoError, OSError, json.JSONDecodeError) as exc:
+        print(f"cannot read the horizon: {exc}", file=sys.stderr)
+        return 2
+
+    if args.html:
+        Path(args.html).write_text(
+            render_html(horizon, subject=args.subject or ""))
+        print(f"wrote {args.html}")
+    else:
+        print(render(horizon))
+
+    # A horizon with a broken undo path is the one state that is actively
+    # misleading elsewhere: every view that trusts the classification counts it
+    # as recoverable. Worth an exit code so a check can catch it.
+    return 1 if horizon.broken else 0
+
+
 def _cmd_demo(args: argparse.Namespace) -> int:
     from .demo import run_demo
 
@@ -463,6 +489,15 @@ def build_parser() -> argparse.ArgumentParser:
     vr.add_argument("--signer", metavar="ID", help="who the signature belongs to")
     vr.add_argument("--json", action="store_true")
     vr.set_defaults(func=_cmd_validation_report)
+
+    hz = sub.add_parser("horizon",
+                        help="render a saved horizon — what can still be undone")
+    hz.add_argument("horizon", help="a horizon saved from ControlPlane.horizon() (JSON)")
+    hz.add_argument("--html", metavar="PATH",
+                    help="write a self-contained page instead of text")
+    hz.add_argument("--subject", metavar="TEXT",
+                    help="what this horizon is of — an estate, a tenant, a session")
+    hz.set_defaults(func=_cmd_horizon)
 
     ct = sub.add_parser("controls", help="print the control mapping")
     ct.add_argument("--json", action="store_true")
