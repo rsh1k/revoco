@@ -46,6 +46,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 from pathlib import Path
 from typing import Any
 
@@ -518,9 +519,13 @@ def probe_claims(ws: RealWorkstation) -> list[dict[str, Any]]:
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--json", action="store_true")
+    ap.add_argument("--run-out", metavar="PATH",
+                    help="write the drills as a ValidationRun, for comparison "
+                         "against a later run")
     ap.add_argument("--keep", action="store_true", help="leave the sandbox in place")
     args = ap.parse_args()
 
+    started = time.time()
     root = Path(tempfile.mkdtemp(prefix="revoco-workstation-"))
     try:
         registry = workstation_registry()
@@ -550,6 +555,17 @@ def main() -> int:
         probe_ws = RealWorkstation(root / "claims")
         seed_sandbox(probe_ws)
         claims = probe_claims(probe_ws)
+
+        if args.run_out:
+            from revoco.validation import ValidationRun
+            run = ValidationRun(
+                id=f"wsrun-{int(started)}", target="workstation-local",
+                started_at=started, finished_at=time.time(),
+                results=tuple(results),
+            )
+            Path(args.run_out).write_text(
+                json.dumps(run.payload(), indent=2, sort_keys=True))
+            print(f"wrote {args.run_out} — digest {run.digest[:16]}")
 
         failed_drills = [r for r in results if r.outcome.is_alarm]
         false_claims = [c for c in claims if not c["holds"]]

@@ -208,6 +208,35 @@ class DrillResult:
             "observed_residue": list(self.observed_residue),
         }
 
+    @classmethod
+    def from_dict(cls, d: dict[str, Any]) -> DrillResult:
+        """Read a result back.
+
+        Needed because a validation run is only useful compared against one from
+        weeks ago, which means crossing a process boundary. A record that can be
+        written and not read is a record of nothing.
+        """
+        try:
+            return cls(
+                id=d["id"],
+                tool=d["tool"],
+                outcome=DrillOutcome(d["outcome"]),
+                declared_kind=Reversibility(d["declared_kind"]),
+                at=float(d["at"]),
+                duration_ms=float(d.get("duration_ms", 0.0)),
+                canary=d.get("canary", ""),
+                error=d.get("error"),
+                mismatches=tuple(d.get("mismatches") or ()),
+                restored=tuple(d.get("restored") or ()),
+                unrestored=tuple(d.get("unrestored") or ()),
+                collateral=tuple(d.get("collateral") or ()),
+                unavailable_reason=d.get("unavailable_reason", ""),
+                residue=d.get("residue", ""),
+                observed_residue=tuple(d.get("observed_residue") or ()),
+            )
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ValidationError(f"malformed DrillResult: {exc}") from None
+
     @property
     def summary(self) -> str:
         if self.outcome is DrillOutcome.PASSED:
