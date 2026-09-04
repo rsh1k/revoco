@@ -433,9 +433,20 @@ def _cmd_horizon(args: argparse.Namespace) -> int:
         print(f"cannot read the horizon: {exc}", file=sys.stderr)
         return 2
 
+    validation = None
+    if args.validation:
+        from .validation import ValidationRun
+        try:
+            validation = ValidationRun.from_dict(
+                json.loads(Path(args.validation).read_text()))
+        except (RevocoError, OSError, json.JSONDecodeError) as exc:
+            print(f"cannot read the validation run: {exc}", file=sys.stderr)
+            return 2
+
     if args.html:
         Path(args.html).write_text(
-            render_html(horizon, subject=args.subject or ""))
+            render_html(horizon, subject=args.subject or "",
+                        validation=validation))
         print(f"wrote {args.html}")
     else:
         print(render(horizon))
@@ -524,6 +535,9 @@ def build_parser() -> argparse.ArgumentParser:
                          "that produced it has exited")
     hz.add_argument("--html", metavar="PATH",
                     help="write a self-contained page instead of text")
+    hz.add_argument("--validation", metavar="PATH",
+                    help="a validation run, to show whether each undo has been "
+                         "proven to work rather than only declared")
     hz.add_argument("--subject", metavar="TEXT",
                     help="what this horizon is of — an estate, a tenant, a session")
     hz.set_defaults(func=_cmd_horizon)
