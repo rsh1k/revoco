@@ -44,12 +44,30 @@ from ..reversal.model import (
     InverseStep,
     ReversalGate,
     Reversibility,
+    StateEquivalence,
 )
 from ..reversal.registry import InverseRegistry
 
 # ---------------------------------------------------------------------------
 # Gates
 # ---------------------------------------------------------------------------
+
+# Nothing is exempt on this surface, and that is a measured result rather than
+# an omission.
+#
+# The first version of this relation excused `node_id`, reasoning that GitHub
+# would mint a fresh one when a ref is recreated and that a correctly restored
+# branch could therefore never match on it. The drill's own residue reporting
+# showed the exemption never firing, and probing it directly showed why: a ref's
+# node_id is a base64 encoding of the ref *path*, identical before a delete and
+# after a recreate at the same SHA. The exemption was excusing a difference that
+# does not occur.
+#
+# It is removed rather than left harmless. An ignore-set is the one knob that can
+# tune a comparison until it cannot fail, and an entry that excuses nothing today
+# is an entry nobody will re-examine when it starts excusing something.
+DEVOPS_EQUIVALENCE = StateEquivalence(name="devops")
+
 
 GATE_GIT_OBJECTS_PRESENT = ReversalGate(
     name="git_objects_not_collected",
