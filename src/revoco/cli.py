@@ -403,8 +403,32 @@ def _cmd_horizon(args: argparse.Namespace) -> int:
     from .console import render_html
     from .reversal.horizon import Horizon, render
 
+    if not args.horizon and not args.store:
+        print("give a saved horizon or --store", file=sys.stderr)
+        return 2
+
     try:
-        horizon = Horizon.from_dict(json.loads(Path(args.horizon).read_text()))
+        if args.store:
+            # Rebuild from what a running control plane persisted. This is the
+            # path an operator actually has: the process that held the horizon in
+            # memory is long gone, and the journal on disk is what is left.
+            from .reversal.horizon import build as build_horizon
+            from .reversal.model import JournalEntry
+            from .store.sqlite import SqliteStore
+
+            # SqliteStore creates the file if it is absent, so a typo in the
+            # path would open an empty database and render "nothing to recover"
+            # — a mistyped argument producing the safest-looking output there is.
+            # Refuse instead.
+            if not Path(args.store).is_file():
+                print(f"cannot read the horizon: no journal at {args.store}",
+                      file=sys.stderr)
+                return 2
+            entries = [JournalEntry.from_dict(r)
+                       for r in SqliteStore(args.store).load_journal()]
+            horizon = build_horizon(entries)
+        else:
+            horizon = Horizon.from_dict(json.loads(Path(args.horizon).read_text()))
     except (RevocoError, OSError, json.JSONDecodeError) as exc:
         print(f"cannot read the horizon: {exc}", file=sys.stderr)
         return 2
@@ -492,7 +516,12 @@ def build_parser() -> argparse.ArgumentParser:
 
     hz = sub.add_parser("horizon",
                         help="render a saved horizon — what can still be undone")
-    hz.add_argument("horizon", help="a horizon saved from ControlPlane.horizon() (JSON)")
+    hz.add_argument("horizon", nargs="?",
+                    help="a horizon saved from ControlPlane.horizon() (JSON)")
+    hz.add_argument("--store", metavar="PATH",
+                    help="rebuild the horizon from a control plane's SQLite journal "
+                         "instead, which is what an operator has after the process "
+                         "that produced it has exited")
     hz.add_argument("--html", metavar="PATH",
                     help="write a self-contained page instead of text")
     hz.add_argument("--subject", metavar="TEXT",

@@ -238,3 +238,49 @@ def test_a_signed_report_verifies_for_someone_holding_only_the_public_key(
                                     c["before"], c["detail"]) for c in d["changes"]),
         signer_id=d["signer_id"], signed_at=d["signed_at"], signature=d["signature"])
     assert rebuilt.verify_signature(pub)
+
+
+def test_horizon_can_be_rendered_straight_from_a_stored_journal(tmp_path, capsys):
+    """The path an operator actually has. The process that held the horizon has
+    exited; the journal on disk is what is left."""
+    from revoco import ControlPlane, Scope, crypto
+    from revoco.gate import load_policy
+    from revoco.reversal import InverseRegistry, InverseSpec, Reversibility
+    from revoco.store.sqlite import SqliteStore
+
+    db = tmp_path / "s.db"
+    store = SqliteStore(str(db))
+    reg = InverseRegistry([
+        InverseSpec(tool="payments.wire", kind=Reversibility.IRREVERSIBLE)])
+    cp = ControlPlane(
+        policy=load_policy({"name": "t", "default_effect": "allow",
+                            "rules": [{"id": "a", "effect": "allow"}]}),
+        inverse_registry=reg, store=store)
+    hp, hb = crypto.generate_keypair()
+    ap, ab = crypto.generate_keypair()
+    cfo = cp.register_human("CFO", hb)
+    bot = cp.register_agent("bot", ab)
+    g = cp.issue_root_delegation(
+        human_private_key=hp, human_id=cfo.id, agent_id=bot.id,
+        scope=Scope.make(tools={"*"}, actions={"write"}, max_risk=90),
+        purpose="p", ttl_seconds=600)
+    v = cp.authorize(actor_private_key=ap, actor_id=bot.id, delegation_id=g.id,
+                     tool="payments.wire", args={"amount": 1}, action="write",
+                     risk=10, session_id="s1")
+    cp.confirm(v)
+
+    out_html = tmp_path / "c.html"
+    assert main(["horizon", "--store", str(db), "--html", str(out_html)]) == 0
+    page = out_html.read_text()
+    assert "payments.wire" in page
+    assert "Standing exposure" in page
+
+
+def test_horizon_needs_something_to_read(capsys):
+    assert main(["horizon"]) == 2
+    assert "saved horizon or --store" in capsys.readouterr().err
+
+
+def test_an_unreadable_store_is_refused_with_a_sentence(tmp_path, capsys):
+    assert main(["horizon", "--store", str(tmp_path / "nope.db")]) == 2
+    assert "cannot read the horizon" in capsys.readouterr().err
