@@ -21,7 +21,7 @@ import json
 import sys
 from typing import Any
 
-from .core.errors import PolicyError
+from .core.errors import PolicyError, RevocoError
 from .evidence import CONTROL_MAP
 from .gate.policy import load_policy
 from .reversal.model import Reversibility
@@ -353,8 +353,16 @@ def _cmd_validation_report(args: argparse.Namespace) -> int:
     def _load(path: str) -> ValidationRun:
         return ValidationRun.from_dict(json.loads(Path(path).read_text()))
 
-    current = _load(args.run)
-    previous = _load(args.previous) if args.previous else None
+    # Three outcomes, not two. A scheduler that cannot tell "a control regressed"
+    # from "the comparison never happened" reads a broken runner as a healthy
+    # estate the moment someone stops reading the log — which is the same
+    # absence-looking-like-success this whole module exists to refuse.
+    try:
+        current = _load(args.run)
+        previous = _load(args.previous) if args.previous else None
+    except (RevocoError, OSError, json.JSONDecodeError) as exc:
+        print(f"cannot compare: {exc}", file=sys.stderr)
+        return 2
 
     if args.signing_key:
         signer_key = crypto.private_key_from_b64(
@@ -367,8 +375,12 @@ def _cmd_validation_report(args: argparse.Namespace) -> int:
         signer_key, _ = crypto.generate_keypair()
         signer_id = "UNSIGNED"
 
-    rep = report(current, previous=previous,
-                 signer_private_key=signer_key, signer_id=signer_id)
+    try:
+        rep = report(current, previous=previous,
+                     signer_private_key=signer_key, signer_id=signer_id)
+    except RevocoError as exc:
+        print(f"cannot compare: {exc}", file=sys.stderr)
+        return 2
 
     if args.json:
         print(json.dumps(rep.to_dict(), indent=2, sort_keys=True))
@@ -378,9 +390,9 @@ def _cmd_validation_report(args: argparse.Namespace) -> int:
             print("\nNOT SIGNED — pass --signing-key to produce evidence a third "
                   "party can verify.")
 
-    # Exit non-zero when something got worse, so a scheduler notices without
-    # anyone reading the output. A standing failure that has not moved is not a
-    # new incident and does not fail the run.
+    # 0 nothing got worse · 1 something did · 2 the check could not be made.
+    # A standing failure that has not moved is not a new incident and does not
+    # fail the run.
     return 1 if not rep.clean else 0
 
 

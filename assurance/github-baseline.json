@@ -1,0 +1,48 @@
+{
+  "finished_at": 1788512749.5025265,
+  "id": "gh-226f68d0",
+  "results": [
+    {
+      "at": 1788512727.5646148,
+      "canary": "branch-delete",
+      "collateral": [],
+      "declared_kind": "reversible",
+      "duration_ms": 7418.38,
+      "error": null,
+      "id": "drl_12297c437766554680aa72f0",
+      "mismatches": [],
+      "observed_residue": [],
+      "outcome": "passed",
+      "residue": "",
+      "restored": [
+        "exists",
+        "node_id",
+        "sha"
+      ],
+      "tool": "github.branch.delete",
+      "unavailable_reason": "",
+      "unrestored": []
+    },
+    {
+      "at": 1788512734.9830549,
+      "canary": "ref-force-update",
+      "collateral": [],
+      "declared_kind": "reversible",
+      "duration_ms": 9123.23,
+      "error": null,
+      "id": "drl_29c2175d21db3e3778e2783e",
+      "mismatches": [],
+      "observed_residue": [],
+      "outcome": "passed",
+      "residue": "",
+      "restored": [
+        "sha"
+      ],
+      "tool": "github.ref.force_update",
+      "unavailable_reason": "",
+      "unrestored": []
+    }
+  ],
+  "started_at": 1788512719.9615667,
+  "target": "github:rsh1k/revoco"
+}
