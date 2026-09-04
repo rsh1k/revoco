@@ -108,14 +108,20 @@ _PATTERNS: list[tuple[re.Pattern[str], ThreatCategory, str, int]] = [
     # --- obfuscation -------------------------------------------------------
     # Zero-width and Unicode-tag characters carry payloads invisible in any
     # review UI, so a human approving the call cannot see what they approved.
-    # Carried over from the memory-integrity work, where it was the one detector
-    # that caught what content scanning missed.
-    (re.compile(r"[​-‏⁠-⁤﻿]"),
-     ThreatCategory.OBFUSCATION, "zero-width-characters", 3),
-    (re.compile(r"[\U000e0000-\U000e007f]"),
-     ThreatCategory.OBFUSCATION, "unicode-tag-characters", 4),
-    (re.compile(r"[‪-‮⁦-⁩]"),
-     ThreatCategory.OBFUSCATION, "bidi-override", 3),
+    # The three obfuscation patterns that used to sit here have moved to
+    # `obfuscation.py`, and were replaced rather than supplemented.
+    #
+    # They were character classes, and a character class cannot tell smuggling
+    # from script. The zero-width one spanned U+200B–U+200F, which includes ZWJ
+    # — the character that joins the parts of a single emoji — and the
+    # left-to-right and right-to-left marks, which are how Hebrew and Arabic are
+    # written. It scored a weight-3 threat vote against 👨‍👩‍👧 and against any
+    # correctly marked right-to-left text, on a surface where accumulated threat
+    # score decides whether a call is escalated.
+    #
+    # The replacement flags the same three techniques and none of those cases,
+    # because it looks at what the character sits next to rather than only at
+    # which character it is.
 ]
 
 
@@ -177,7 +183,14 @@ class ThreatScanner:
         self.max_excerpt = max_excerpt
 
     def scan(self, arguments: dict[str, Any]) -> ScanResult:
-        hits: list[ThreatHit] = []
+        # Hidden-character detection runs first and separately, because it is the
+        # one class the patterns below cannot reach: a zero-width character
+        # wedged into a word defeats every regex here by construction, and no
+        # additional pattern fixes that.
+        from .obfuscation import detect as _detect_hidden
+
+        hits: list[ThreatHit] = list(_detect_hidden(arguments,
+                                                    max_excerpt=self.max_excerpt))
         for path, value in _walk_strings(arguments or {}):
             for pattern, category, label, weight in _PATTERNS:
                 m = pattern.search(value)
