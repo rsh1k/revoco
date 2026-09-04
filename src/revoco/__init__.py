@@ -92,6 +92,15 @@ from .reversal import (
     ap_starter_registry,
 )
 from .reversal.budget import IrreversibilityBudget
+from .validation import (
+    Change,
+    ControlChange,
+    ValidationReport,
+    ValidationRun,
+    compare,
+)
+from .validation import render as render_validation
+from .validation import report as validation_report
 
 
 def _detect_version() -> str:
@@ -128,6 +137,13 @@ def _detect_version() -> str:
 __version__ = _detect_version()
 
 __all__ = [
+    "ValidationRun",
+    "ValidationReport",
+    "ControlChange",
+    "Change",
+    "compare",
+    "validation_report",
+    "render_validation",
     "__version__",
     # control plane
     "ControlPlane",
