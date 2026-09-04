@@ -171,3 +171,67 @@ def test_the_revert_inverse_is_given_enough_to_locate_the_branch():
         "the merge SHA is only knowable from the response, which is why the "
         "proxy confirms on the response rather than on the forward call"
     )
+
+
+# ---- protection: the control that protects itself from cleanup -------------
+
+def test_protection_is_stripped_before_refs_are_swept(monkeypatch):
+    """A protected branch refuses deletion — the API answers 422 "Cannot delete
+    this branch". Sweeping refs first would leak the canary that is hardest to
+    remove by hand. Order is the whole fix, so order is what is asserted."""
+    gh = _gh()
+    gh.created = ["revoco-canary/run1/protect-me"]
+    gh.protected = {"revoco-canary/run1/protect-me"}
+    calls: list[str] = []
+
+    def fake_api(*args, **kwargs):
+        joined = " ".join(str(a) for a in args)
+        if "protection" in joined:
+            calls.append("unprotect")
+        elif "git/refs" in joined and "DELETE" in joined:
+            calls.append("delete-ref")
+        return None
+
+    monkeypatch.setattr(gh, "_api", fake_api)
+    monkeypatch.setattr(gh, "ref_sha", lambda ref: None)
+    gh.sweep()
+
+    assert "unprotect" in calls and "delete-ref" in calls
+    assert calls.index("unprotect") < calls.index("delete-ref"), (
+        "refs swept before protection was removed; the branch would survive"
+    )
+
+
+def test_protection_writes_go_through_the_namespace_guard(monkeypatch):
+    gh = _gh()
+    monkeypatch.setattr(gh, "_api", lambda *a, **k: pytest.fail("reached the API"))
+    with pytest.raises(GitHubApiError, match="revoco-canary"):
+        gh.put_protection("main", {"enforce_admins": True})
+    with pytest.raises(GitHubApiError, match="revoco-canary"):
+        gh.execute("github.repo.update_branch_protection",
+                   {"branch": "main", "protection": {}})
+
+
+def test_protection_is_read_in_the_shape_the_write_accepts(monkeypatch):
+    """GitHub returns each toggle nested under {"enabled": bool} and accepts it
+    as a bare boolean. Round-tripping the GET response straight into the PUT is
+    rejected, and a snapshot that cannot be replayed is a phantom rollback whose
+    plan looks complete until it runs."""
+    gh = _gh()
+    monkeypatch.setattr(gh, "_api", lambda *a, **k: {
+        "enforce_admins": {"enabled": True},
+        "allow_force_pushes": {"enabled": False},
+        "allow_deletions": {"enabled": False},
+        "url": "https://api.github.com/...",
+    })
+    body = gh.get_protection("revoco-canary/run1/b")
+    assert body is not None
+    assert body["enforce_admins"] is True          # flattened, not {"enabled": ...}
+    assert body["allow_force_pushes"] is False
+    assert "url" not in body, "read-only fields must not be echoed into a write"
+
+
+def test_an_unprotected_branch_reads_as_no_protection(monkeypatch):
+    gh = _gh()
+    monkeypatch.setattr(gh, "_api", lambda *a, **k: None)
+    assert gh.get_protection("revoco-canary/run1/b") is None

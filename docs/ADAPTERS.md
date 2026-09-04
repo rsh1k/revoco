@@ -8,9 +8,12 @@
 python scripts/validate_workstation.py
 ```
 
-`devops` is **partially validated**: three GitHub specs — `github.branch.delete`,
-`github.ref.force_update` and `github.pr.merge` — are drilled against the live
-GitHub API by `scripts/drill_github.py`. The Kubernetes
+`devops` is **validated for GitHub**: every drillable GitHub spec —
+`github.branch.delete`, `github.ref.force_update`, `github.pr.merge` and
+`github.repo.update_branch_protection` — is drilled against the live API by
+`scripts/drill_github.py`, nightly. The fifth, `github.repo.delete`, is
+irreversible and has nothing to prove. The Kubernetes and feature-flag specs on
+this surface are not validated. The Kubernetes
 and feature-flag specs on that surface are not.
 
 The other six surfaces are **specification, not validated integration.**
@@ -319,7 +322,7 @@ A spec that declares gates and runs without an evaluator refuses to execute, and
 
 ## What validating one surface actually taught us
 
-`scripts/validate_workstation.py` drills all 10 drillable inverses against a real filesystem and a real `git init` repo, then probes the prose claims the classifications rest on. It found nine things, and every one of them is a pattern that will recur on the surfaces still unvalidated.
+`scripts/validate_workstation.py` drills all 10 drillable inverses against a real filesystem and a real `git init` repo, then probes the prose claims the classifications rest on. It found eleven things, and every one of them is a pattern that will recur on the surfaces still unvalidated.
 
 **1. A snapshot field that looks right can produce an undo that succeeds and leaves you somewhere else.** `git.checkout`'s inverse restores `snapshot.head_ref`. The first integration captured that as `git symbolic-ref HEAD` — `refs/heads/main` — and feeding a full ref path to `git checkout` **detaches HEAD** instead of switching to the branch. The inverse returned success. State was materially different. Nothing but a state comparison catches that, which is the entire argument for drills over health checks.
 
@@ -339,6 +342,10 @@ A spec that declares gates and runs without an evaluator refuses to execute, and
 
 **9. Residue prose, confirmed rather than corrected.** Finding 3 was residue written from documentation that turned out wrong. `github.pr.merge` is the opposite: its prose said a revert adds a commit rather than removing the merge, so history shows both and the merge event stands. Drilling it measured exactly that — `base_tree` returned, `base_sha` and `pr_state` did not. The two exemptions on the `devops` relation are those two fields, and their reasons cite the measurement rather than the documentation. A residue claim is not suspect because it came from a vendor document; it is suspect until something has executed it.
 
+**10. A control that protects a branch also protects it from cleanup.** Drilling `github.repo.update_branch_protection` means protecting a canary branch, and a protected branch **refuses deletion** — the API answers 422 *"Cannot delete this branch"*. A teardown sweeping refs before stripping protection would leak precisely the canary that is hardest to remove by hand, in a repository the runner was pointed at because it was safe. Found by probing the behaviour before writing the drill rather than by leaking one; the sweep now removes protection first. **Any surface where the thing being drilled is itself a guard will have a version of this.**
+
+**11. The read schema and the write schema are not the same schema.** GitHub returns branch protection with every toggle nested under `{"enabled": bool}` and accepts it as a bare boolean. A spec written from the documentation round-trips the GET response straight back into the PUT and is rejected. Nothing about the documentation warns of it, and nothing short of executing the inverse would surface it — a snapshot that cannot be replayed is a phantom rollback whose plan looks complete right up to the moment it runs.
+
 ### What this means for the other six surfaces
 
 The failure modes above are not filesystem-specific. Expect the same shapes in SAP and Workday:
@@ -349,4 +356,4 @@ The failure modes above are not filesystem-specific. Expect the same shapes in S
 - gates that no evaluator answers, silently shrinking what a drill actually covers (finding 5)
 - canaries that do not actually move the state they claim to test — a reset with nothing to reset, a posting into a period that rejects it silently — so the drill passes without ever exercising the inverse (finding 6, the only one that fails green)
 
-Which is the argument for validating the cheap surface first: none of these nine needed an ERP sandbox to find, and all nine would have cost far more to discover there.
+Which is the argument for validating the cheap surface first: none of these eleven needed an ERP sandbox to find, and all eleven would have cost far more to discover there.

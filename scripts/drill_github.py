@@ -70,6 +70,7 @@ class GitHub:
         self.owner, self.repo, self.run_id = owner, repo, run_id
         self.created: list[str] = []
         self.prs: list[int] = []
+        self.protected: set[str] = set()
 
     # -- plumbing -----------------------------------------------------------
     def _api(self, *args: str, check: bool = True) -> Any:
@@ -128,6 +129,45 @@ class GitHub:
         self.created.append(name)
         return name
 
+    # -- branch protection --------------------------------------------------
+    def get_protection(self, branch: str) -> dict[str, Any] | None:
+        """Read protection in the shape the PUT body wants.
+
+        The GET response and the PUT body are different schemas — GET nests each
+        toggle under `{"enabled": bool}` and PUT takes a bare boolean. A spec
+        written from the documentation would round-trip the GET response
+        straight back and be rejected, which is the class of defect only an
+        execution finds.
+        """
+        got = self._api(f"repos/{self.owner}/{self.repo}/branches/{branch}/protection",
+                        check=False)
+        if got is None:
+            return None
+        return {
+            "required_status_checks": None,
+            "enforce_admins": bool(got.get("enforce_admins", {}).get("enabled")),
+            "required_pull_request_reviews": None,
+            "restrictions": None,
+            "allow_force_pushes": bool(got.get("allow_force_pushes", {}).get("enabled")),
+            "allow_deletions": bool(got.get("allow_deletions", {}).get("enabled")),
+        }
+
+    def put_protection(self, branch: str, body: dict[str, Any] | None) -> None:
+        branch = self._guard(branch)
+        if body is None:
+            self._api("-X", "DELETE",
+                      f"repos/{self.owner}/{self.repo}/branches/{branch}/protection",
+                      check=False)
+            return
+        proc = subprocess.run(
+            ["gh", "api", "-X", "PUT",
+             f"repos/{self.owner}/{self.repo}/branches/{branch}/protection",
+             "--input", "-"],
+            input=json.dumps(body), capture_output=True, text=True)
+        if proc.returncode != 0:
+            raise GitHubApiError(f"put protection on {branch}: {proc.stderr.strip()}")
+        self.protected.add(branch)
+
     def open_pr(self, head: str, base: str) -> int:
         got = self._api("-X", "POST", f"repos/{self.owner}/{self.repo}/pulls",
                         "-f", f"title=revoco canary {self.run_id}",
@@ -139,6 +179,14 @@ class GitHub:
     def sweep(self) -> list[str]:
         """Remove every canary this run created. Returns what survived."""
         stuck = []
+        # Protection first. A protected branch refuses deletion outright — the
+        # API answers 422 "Cannot delete this branch" — so sweeping refs before
+        # stripping protection leaks exactly the canary that is hardest to clean
+        # up by hand. Confirmed against the live API before this ran in anger.
+        for branch in list(self.protected):
+            self._api("-X", "DELETE",
+                      f"repos/{self.owner}/{self.repo}/branches/{branch}/protection",
+                      check=False)
         for number in list(self.prs):
             self._api("-X", "PATCH", f"repos/{self.owner}/{self.repo}/pulls/{number}",
                       "-f", "state=closed", check=False)
@@ -197,12 +245,19 @@ class GitHub:
                       f"repos/{self.owner}/{self.repo}/git/refs/heads/{base}",
                       "-f", f"sha={rev['sha']}")
             return {"sha": rev["sha"], "restored_tree": pre_tree}
+        if tool == "github.repo.update_branch_protection":
+            branch = self._guard(args["branch"])
+            self.put_protection(branch, args["protection"])
+            return {"branch": branch}
         raise GitHubApiError(f"no executor for {tool}")
 
     def read_state(self, tool: str, args: dict[str, Any],
                    fields: tuple[str, ...]) -> dict[str, Any]:
         sha = self.ref_sha(args["ref"]) if "ref" in args else None
-        prior = {"tip_sha": sha, "prior_sha": sha}
+        prior: dict[str, Any] = {"tip_sha": sha, "prior_sha": sha}
+        if "branch" in args:
+            prior["protection"] = self.get_protection(
+                args["branch"].removeprefix("refs/heads/"))
         return {f: prior.get(f) for f in fields}
 
 
@@ -236,6 +291,22 @@ def build_canaries(gh: GitHub, base_sha: str, second_sha: str) -> list[Canary]:
     # default branch. A ref guard does not help here — a merge names a base
     # branch rather than a ref to write — so the isolation has to come from
     # choosing the base.
+    # An agent weakening branch protection is a control being switched off, so
+    # the canary starts protected and the forward action turns it off. Starting
+    # unprotected would drill the reverse of the threat.
+    protect_ref = gh.make_canary_ref("protect-me", base_sha)
+    strong = {"required_status_checks": None, "enforce_admins": True,
+              "required_pull_request_reviews": None, "restrictions": None,
+              "allow_force_pushes": False, "allow_deletions": False}
+    weak = {**strong, "enforce_admins": False, "allow_force_pushes": True}
+    gh.put_protection(protect_ref, strong)
+
+    def protection_state() -> dict[str, Any]:
+        got = gh.get_protection(protect_ref) or {}
+        return {"enforce_admins": got.get("enforce_admins"),
+                "allow_force_pushes": got.get("allow_force_pushes"),
+                "allow_deletions": got.get("allow_deletions")}
+
     pr_base = gh.make_canary_ref("pr-base", base_sha)
     pr_head = gh.make_canary_ref("pr-head", second_sha)
     pr_number = gh.open_pr(pr_head, pr_base)
@@ -261,6 +332,11 @@ def build_canaries(gh: GitHub, base_sha: str, second_sha: str) -> list[Canary]:
                args={"owner": gh.owner, "repo": gh.repo, "ref": force_ref,
                      "sha": second_sha, "force": True},
                verify=verify(force_ref), label="ref-force-update",
+               equivalence=DEVOPS_EQUIVALENCE),
+        Canary(tool="github.repo.update_branch_protection",
+               args={"owner": gh.owner, "repo": gh.repo,
+                     "branch": protect_ref, "protection": weak},
+               verify=protection_state, label="branch-protection",
                equivalence=DEVOPS_EQUIVALENCE),
         Canary(tool="github.pr.merge",
                args={"owner": gh.owner, "repo": gh.repo, "number": pr_number},
