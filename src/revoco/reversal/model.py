@@ -729,6 +729,20 @@ class PlannedStep:
     description: str = ""
     critical: bool = True
 
+    @classmethod
+    def from_dict(cls, d: dict[str, Any]) -> PlannedStep:
+        try:
+            return cls(
+                name=d["name"], tool=d["tool"], args=dict(d.get("args") or {}),
+                unresolved=tuple(d.get("unresolved") or ()),
+                deferred=tuple(d.get("deferred") or ()),
+                from_prior_step=tuple(d.get("from_prior_step") or ()),
+                description=d.get("description", ""),
+                critical=bool(d.get("critical", True)),
+            )
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ValidationError(f"malformed PlannedStep: {exc}") from None
+
     def to_dict(self) -> dict[str, Any]:
         return {
             "name": self.name,
@@ -827,6 +841,30 @@ class ReversalPlan:
         """Stable digest of the plan, for binding into signed records."""
         return crypto.digest_of(self.to_dict())
 
+    @classmethod
+    def from_dict(cls, d: dict[str, Any]) -> ReversalPlan:
+        try:
+            return cls(
+                id=d["id"], tool=d["tool"], kind=Reversibility(d["kind"]),
+                inverse_tool=d.get("inverse_tool"),
+                inverse_args=dict(d.get("inverse_args") or {}),
+                unresolved_args=tuple(d.get("unresolved_args") or ()),
+                snapshot=dict(d.get("snapshot") or {}),
+                window_seconds=(
+                    float(d["window_seconds"])
+                    if d.get("window_seconds") is not None else None
+                ),
+                residue=d.get("residue", ""),
+                created_at=float(d["created_at"]),
+                snapshot_error=d.get("snapshot_error"),
+                deferred_args=tuple(d.get("deferred_args") or ()),
+                steps=tuple(PlannedStep.from_dict(x) for x in d.get("steps") or ()),
+                gates=tuple(ReversalGate.from_dict(g) for g in d.get("gates") or ()),
+                one_shot=bool(d.get("one_shot", False)),
+            )
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ValidationError(f"malformed ReversalPlan: {exc}") from None
+
     def to_dict(self) -> dict[str, Any]:
         return {
             "id": self.id,
@@ -894,6 +932,38 @@ class JournalEntry:
         if exp is None:
             return False
         return (now if now is not None else time.time()) >= exp
+
+    @classmethod
+    def from_dict(cls, d: dict[str, Any]) -> JournalEntry:
+        """Rebuild an entry from what was persisted.
+
+        Two asymmetries with :meth:`to_dict`, both deliberate and both worth
+        knowing before trusting a rebuilt entry:
+
+        ``expires_at`` is written but not read. It is derived from the plan's
+        window and the commit time, so accepting the stored value would let a
+        hand-edited file claim a window the plan does not support.
+
+        ``reversal_result`` is never written at all, so a rebuilt entry does not
+        carry what an undo returned. Nothing in the horizon needs it; anything
+        that does must read the ledger rather than this.
+        """
+        try:
+            return cls(
+                id=d["id"], plan=ReversalPlan.from_dict(d["plan"]),
+                state=JournalState(d["state"]),
+                action_id=d.get("action_id"),
+                delegation_id=d.get("delegation_id"),
+                session_id=d.get("session_id", ""),
+                actor_id=d.get("actor_id"),
+                committed_at=d.get("committed_at"),
+                resolved_at=d.get("resolved_at"),
+                error=d.get("error"),
+                note=d.get("note", ""),
+                history=list(d.get("history") or ()),
+            )
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ValidationError(f"malformed JournalEntry: {exc}") from None
 
     def to_dict(self) -> dict[str, Any]:
         return {
