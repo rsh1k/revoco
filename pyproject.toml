@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "revoco"
-version = "0.5.10"
+version = "0.5.11"
 description = "Undo for AI agent actions. Plans the rollback before the action runs, proves it still works, and rolls back a compromised grant's whole blast radius in one call."
 readme = "README.md"
 requires-python = ">=3.10"
