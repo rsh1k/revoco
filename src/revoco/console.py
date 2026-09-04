@@ -30,7 +30,9 @@ import html
 import time
 from typing import Any
 
+from .drills import DrillOutcome
 from .reversal.horizon import Horizon, HorizonEntry
+from .validation import ValidationRun
 
 # Buckets in the order an operator needs them, not alphabetically. `broken`
 # leads: an undo path with a hole in it reads as recoverable on every other
@@ -49,6 +51,46 @@ _SECTIONS: tuple[tuple[str, str, str], ...] = (
      "Undoable with nothing counting down. Not permanent: a gate can close and a "
      "drill can go stale."),
 )
+
+
+# How a control's undo stands, from the last validation run. The distinction
+# that matters is between never asked and asked and told no.
+PROVEN, DISPROVEN, UNTESTED, UNKNOWN = "proven", "disproven", "untested", "unknown"
+
+_PROOF_LABEL = {
+    PROVEN: "proven",
+    DISPROVEN: "DISPROVEN",
+    UNTESTED: "nothing to prove",
+    UNKNOWN: "never drilled",
+}
+
+
+def _proof_index(validation: ValidationRun | None) -> dict[str, str]:
+    if validation is None:
+        return {}
+    out: dict[str, str] = {}
+    for r in validation.results:
+        if r.outcome is DrillOutcome.NOT_DRILLABLE:
+            out[r.tool] = UNTESTED
+        elif r.outcome.is_proof:
+            out[r.tool] = PROVEN
+        else:
+            out[r.tool] = DISPROVEN
+    return out
+
+
+def _unproven(horizon: Horizon, proof: dict[str, str]) -> int:
+    """Entries the horizon counts as recoverable whose undo nobody has proven.
+
+    The horizon reads a classification; a drill reads the world. An entry can sit
+    in `closing` with thirty minutes left and be relying on an inverse whose last
+    execution failed — recoverable on every view, and not.
+    """
+    if not proof:
+        return 0
+    recoverable = list(horizon.closing) + list(horizon.open_indefinitely)
+    return sum(1 for e in recoverable
+               if proof.get(e.tool, UNKNOWN) in (DISPROVEN, UNKNOWN))
 
 
 def _fmt_duration(seconds: float | None) -> str:
@@ -75,15 +117,27 @@ def _e(text: Any) -> str:
     return html.escape(str(text), quote=True)
 
 
-def _row(entry: HorizonEntry, *, urgent: bool) -> str:
-    cls = ' class="urgent"' if urgent else ""
+def _row(entry: HorizonEntry, *, urgent: bool, proof: dict[str, str],
+         show_proof: bool, recoverable: bool) -> str:
     gates = ", ".join(entry.gates) or "—"
     detail = entry.reason or entry.residue
+    cell = ""
+    if show_proof:
+        state = proof.get(entry.tool, UNKNOWN)
+        # Only alarming where the horizon is claiming the undo is available. An
+        # undrilled inverse on an action nothing can undo anyway is noise.
+        bad = recoverable and state in (DISPROVEN, UNKNOWN)
+        if bad:
+            urgent = True
+        klass = " unproven" if bad else ""
+        cell = f'<td class="proof{klass}">{_e(_PROOF_LABEL[state])}</td>'
+    cls = ' class="urgent"' if urgent else ""
     return (
         f"<tr{cls}>"
         f'<td class="tool">{_e(entry.tool)}</td>'
         f'<td>{_e(entry.kind.value)}</td>'
-        f'<td class="num">{_e(_fmt_duration(entry.seconds_remaining))}</td>'
+        + cell
+        + f'<td class="num">{_e(_fmt_duration(entry.seconds_remaining))}</td>'
         f"<td>{_e(_fmt_when(entry.committed_at))}</td>"
         f"<td>{_e(entry.session_id or '—')}</td>"
         f"<td>{_e(gates)}</td>"
@@ -93,8 +147,16 @@ def _row(entry: HorizonEntry, *, urgent: bool) -> str:
 
 
 def render_html(horizon: Horizon, *, title: str = "Reversibility horizon",
-                subject: str = "") -> str:
-    """One self-contained page. No network, no script, no state."""
+                subject: str = "",
+                validation: ValidationRun | None = None) -> str:
+    """One self-contained page. No network, no script, no state.
+
+    With a validation run the page also answers the question the horizon alone
+    cannot: not just *is there an undo* but *has anyone shown it works*.
+    """
+    proof = _proof_index(validation)
+    show_proof = bool(proof)
+    unproven = _unproven(horizon, proof)
     ttc = horizon.time_to_first_close
     nxt = horizon.next_to_close
     total = horizon.undoable_count + horizon.unrecoverable_count
@@ -112,14 +174,19 @@ def render_html(horizon: Horizon, *, title: str = "Reversibility horizon",
         if not rows:
             continue
         soon = {e.journal_id for e in horizon.closing_soon} if key == "closing" else set()
-        body = "".join(_row(e, urgent=(key == "broken" or e.journal_id in soon))
-                       for e in rows)
+        recoverable = key in ("closing", "open_indefinitely")
+        body = "".join(
+            _row(e, urgent=(key == "broken" or e.journal_id in soon),
+                 proof=proof, show_proof=show_proof, recoverable=recoverable)
+            for e in rows)
+        proof_th = "<th>Undo proven</th>" if show_proof else ""
         parts.append(
             f'<section class="{_e(key)}">'
             f"<h2>{_e(label)} <span class=\"count\">{len(rows)}</span></h2>"
             f"<p class=\"blurb\">{_e(blurb)}</p>"
             '<div class="tw"><table><thead><tr>'
-            "<th>Tool</th><th>Posture</th><th>Left</th><th>Committed</th>"
+            "<th>Tool</th><th>Posture</th>" + proof_th +
+            "<th>Left</th><th>Committed</th>"
             "<th>Session</th><th>Gates</th><th>Detail</th>"
             "</tr></thead><tbody>" + body + "</tbody></table></div></section>"
         )
@@ -146,6 +213,13 @@ def render_html(horizon: Horizon, *, title: str = "Reversibility horizon",
         # The tile turns red only when there is something in it. A permanently
         # coloured alarm is one people stop seeing.
         bad_broken=" bad" if horizon.broken else "",
+        proof_tile=(
+            f'<div class="tile{" bad" if unproven else ""}"><b>{unproven}</b>'
+            "<span>Counted recoverable, undo not proven</span></div>"
+            if show_proof else
+            '<div class="tile"><b>—</b><span>No validation run supplied; '
+            "nothing here is known to work</span></div>"
+        ),
         standing=len(horizon.standing_exposure),
         soon=len(horizon.closing_soon),
         warn=_fmt_duration(horizon.warn_within),
@@ -191,6 +265,8 @@ tbody tr:last-child td{{border-bottom:none}}
 td.num{{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}}
 td.tool{{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;white-space:nowrap}}
 td.detail{{color:var(--mut);max-width:38ch}}
+td.proof{{white-space:nowrap;color:var(--ok)}}
+td.proof.unproven{{color:var(--urg);font-weight:600}}
 tr.urgent td{{background:var(--urg-bg)}}
 tr.urgent td.num{{color:var(--urg);font-weight:600}}
 .notes ul{{margin:0;padding-left:18px;color:var(--mut);font-size:.9rem}}
@@ -205,6 +281,7 @@ color:var(--mut);font-size:.8rem}}
 <div class="tile{bad_broken}"><b>{broken}</b><span>Claim an undo they cannot run</span></div>
 <div class="tile"><b>{standing}</b><span>Standing exposure — never undoable</span></div>
 <div class="tile"><b>{soon}</b><span>Closing within {warn}</span></div>
+{proof_tile}
 </div>
 </header>
 {sections}

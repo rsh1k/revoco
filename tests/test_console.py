@@ -11,8 +11,10 @@ from __future__ import annotations
 import re
 
 from revoco.console import render_html
+from revoco.drills import DrillOutcome, DrillResult
 from revoco.reversal import Reversibility
 from revoco.reversal.horizon import Horizon, HorizonEntry
+from revoco.validation import ValidationRun
 
 
 def _entry(tool="t", kind=Reversibility.REVERSIBLE, remaining=None, **kw):
@@ -129,3 +131,75 @@ def test_a_horizon_survives_being_saved_and_read_back():
     assert [e.tool for e in back.closing] == ["payments.schedule"]
     assert back.standing_exposure[0].kind is Reversibility.IRREVERSIBLE
     assert back.notes == ["a note"]
+
+
+# ---- the overlay: is there an undo, and has anyone shown it works ----------
+
+def _run(*pairs) -> ValidationRun:
+    results = tuple(
+        DrillResult(id=f"d{i}", tool=tool, outcome=outcome,
+                    declared_kind=Reversibility.REVERSIBLE, at=1_700_000_000.0,
+                    duration_ms=1.0)
+        for i, (tool, outcome) in enumerate(pairs))
+    return ValidationRun(id="v", target="t", started_at=1_700_000_000.0,
+                         finished_at=1_700_000_001.0, results=results)
+
+
+def test_without_a_validation_run_the_page_says_nothing_is_known_to_work():
+    """Absent evidence must not render as present evidence. The tile says so
+    rather than being omitted, because a missing column reads as no problem."""
+    page = render_html(_h(open_indefinitely=(_entry(tool="vendors.update"),)))
+    assert "Undo proven" not in page
+    assert "nothing here is known to work" in page
+
+
+def test_a_recoverable_entry_whose_drill_failed_is_marked_and_counted():
+    """The case the overlay exists for. The horizon reads a classification and
+    says recoverable; the drill read the world and says the inverse does not
+    restore. Every other view shows this as fine."""
+    page = render_html(
+        _h(open_indefinitely=(_entry(tool="vendors.update"),)),
+        validation=_run(("vendors.update", DrillOutcome.FAILED)))
+    assert "DISPROVEN" in page
+    assert "proof unproven" in page
+    assert "<b>1</b><span>Counted recoverable, undo not proven" in page
+
+
+def test_a_recoverable_entry_never_drilled_counts_as_unproven():
+    """Never asked and asked-and-told-no are different facts, and neither is
+    proof. Both belong in the count."""
+    page = render_html(
+        _h(open_indefinitely=(_entry(tool="never.drilled"),)),
+        validation=_run(("something.else", DrillOutcome.PASSED)))
+    assert "never drilled" in page
+    assert "<b>1</b><span>Counted recoverable, undo not proven" in page
+
+
+def test_a_proven_undo_is_not_flagged():
+    page = render_html(
+        _h(open_indefinitely=(_entry(tool="vendors.update"),)),
+        validation=_run(("vendors.update", DrillOutcome.PASSED)))
+    assert "proof unproven" not in page
+    assert "<b>0</b><span>Counted recoverable, undo not proven" in page
+
+
+def test_an_undrilled_irreversible_action_is_not_flagged_as_unproven():
+    """Noise discipline. Standing exposure is not claiming an undo, so an absent
+    drill for it is not a contradiction — flagging it would put a permanent
+    number on the tile and teach people to ignore it."""
+    page = render_html(
+        _h(standing_exposure=(_entry(tool="payments.wire",
+                                     kind=Reversibility.IRREVERSIBLE),)),
+        validation=_run(("something.else", DrillOutcome.PASSED)))
+    assert "proof unproven" not in page
+    assert "<b>0</b><span>Counted recoverable, undo not proven" in page
+
+
+def test_a_control_with_nothing_to_prove_says_so_rather_than_unproven():
+    """A read has no inverse to demonstrate. Reporting it as unproven would be
+    counting the absence of a test that could never exist."""
+    page = render_html(
+        _h(open_indefinitely=(_entry(tool="fs.read_file"),)),
+        validation=_run(("fs.read_file", DrillOutcome.NOT_DRILLABLE)))
+    assert "nothing to prove" in page
+    assert "proof unproven" not in page
