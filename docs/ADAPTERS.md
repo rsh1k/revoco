@@ -1,6 +1,6 @@
 # System-of-record adapters
 
-**Status: one surface validated, seven specified.**
+**Status: one surface validated, one partially, six specified.**
 
 `workstation` (14 specs) is **validated against a real filesystem and a real git repo** — 10 of 10 drillable inverses restore state, and 10 prose claims were probed empirically. Run it yourself:
 
@@ -8,7 +8,12 @@
 python scripts/validate_workstation.py
 ```
 
-The other seven surfaces are **specification, not validated integration.**
+`devops` is **partially validated**: the two GitHub ref specs — `github.branch.delete`
+and `github.ref.force_update` — are drilled against the live GitHub API by
+`scripts/drill_github.py`, under a relation that exempts nothing. The Kubernetes
+and feature-flag specs on that surface are not.
+
+The other six surfaces are **specification, not validated integration.**
 
 Everything else in Revoco is transferable across customers. This is not. Knowing that an SAP payment reversal is a three-step ordered sequence, that a Workday rescind dies the moment payroll runs, or that an S3 delete is recoverable only if someone enabled versioning first, is per-system knowledge that has to be built once and maintained forever. It is also the moat — capital cannot shortcut it, and a horizontal identity vendor will not do it.
 
@@ -314,7 +319,7 @@ A spec that declares gates and runs without an evaluator refuses to execute, and
 
 ## What validating one surface actually taught us
 
-`scripts/validate_workstation.py` drills all 10 drillable inverses against a real filesystem and a real `git init` repo, then probes the prose claims the classifications rest on. It found six things, and every one of them is a pattern that will recur on the surfaces still unvalidated.
+`scripts/validate_workstation.py` drills all 10 drillable inverses against a real filesystem and a real `git init` repo, then probes the prose claims the classifications rest on. It found seven things, and every one of them is a pattern that will recur on the surfaces still unvalidated.
 
 **1. A snapshot field that looks right can produce an undo that succeeds and leaves you somewhere else.** `git.checkout`'s inverse restores `snapshot.head_ref`. The first integration captured that as `git symbolic-ref HEAD` — `refs/heads/main` — and feeding a full ref path to `git checkout` **detaches HEAD** instead of switching to the branch. The inverse returned success. State was materially different. Nothing but a state comparison catches that, which is the entire argument for drills over health checks.
 
@@ -328,7 +333,9 @@ A spec that declares gates and runs without an evaluator refuses to execute, and
 
 **6. A canary that changes nothing turns a drill green without testing anything.** Two of the original eleven drills were passing vacuously. `git.reset_hard` reset to `HEAD` on a repo with one commit, so nothing moved and the inverse had nothing to restore. `fs.read_file` is a read — trivially `REVERSIBLE` with a no-op inverse, so it could never fail. Both compared identical state before and after, both reported success, and both counted toward the proven total. The runner now reads state a third time, immediately after the forward action, and reports `FORWARD_NO_OP` when nothing moved; it is an alarm, because a suite of vacuous drills reports green while covering none of the surface. Specs whose forward action genuinely has no side effects declare `no_side_effects=True` and are not drilled at all. **This is the only finding here whose failure mode is a passing test, which makes it the one least likely to be noticed on a surface nobody can check by hand.**
 
-### What this means for the other seven surfaces
+**7. An exemption written from reasoning excused a difference that does not occur.** The first state-equivalence relation for `devops` excused `node_id`, on the reasoning that GitHub would mint a fresh one when a ref is recreated and a correctly restored branch could therefore never match on it. It sounded right and it was wrong: a ref's node_id is a base64 encoding of the ref *path*, identical before a delete and after a recreate at the same SHA. The drill's own residue reporting gave it away by never firing, and a direct probe confirmed it. The exemption was removed rather than left as a harmless no-op, because an ignore-set is the one knob that can tune a comparison until it cannot fail, and an entry excusing nothing today is an entry nobody re-examines when it starts excusing something. **This is finding 3 again, one layer up: the residue prose was written from documentation, and so was the exemption.**
+
+### What this means for the other six surfaces
 
 The failure modes above are not filesystem-specific. Expect the same shapes in SAP and Workday:
 
@@ -338,4 +345,4 @@ The failure modes above are not filesystem-specific. Expect the same shapes in S
 - gates that no evaluator answers, silently shrinking what a drill actually covers (finding 5)
 - canaries that do not actually move the state they claim to test — a reset with nothing to reset, a posting into a period that rejects it silently — so the drill passes without ever exercising the inverse (finding 6, the only one that fails green)
 
-Which is the argument for validating the cheap surface first: none of these six needed an ERP sandbox to find, and all six would have cost far more to discover there.
+Which is the argument for validating the cheap surface first: none of these seven needed an ERP sandbox to find, and all seven would have cost far more to discover there.

@@ -116,11 +116,23 @@ def test_every_surface_states_whether_it_has_an_equivalence_relation():
 
 
 def test_the_missing_equivalence_surfaces_are_named_rather_than_just_counted(capsys):
+    """Derived from the registry rather than hard-coded.
+
+    The first version asserted "1/8" and failed the day a second surface got a
+    relation — which is the tool working, and a test that has to be edited every
+    time the thing it measures improves is a test that gets edited without being
+    read."""
+    declared = [n for n, eq in EQUIVALENCES.items() if eq is not None]
+    missing = [n for n in SURFACES if EQUIVALENCES.get(n) is None]
+
     assert main(["surfaces"]) == 0
     out = capsys.readouterr().out
-    assert "surfaces with a declared equivalence 1/8" in out
-    for name in ("sap", "workday", "cloud"):
-        assert name in out.split("No equivalence relation is declared for:")[1]
+    assert (f"surfaces with a declared equivalence {len(declared)}/{len(SURFACES)}"
+            in out)
+    assert missing, "if every surface has one, this assertion needs rewriting"
+    named = out.split("No equivalence relation is declared for:")[1]
+    for name in missing:
+        assert name in named
 
 
 def test_an_unknown_surface_is_refused_rather_than_reported_as_having_none():

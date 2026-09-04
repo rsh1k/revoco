@@ -51,7 +51,12 @@ from ..reversal.registry import InverseRegistry
 from . import cloud, database, devops, identity, ras_eval, saas, sap, workday, workstation
 from .cloud import CLOUD_GATES, CLOUD_SPECS, cloud_registry
 from .database import DATABASE_GATES, DATABASE_SPECS, database_registry
-from .devops import DEVOPS_GATES, DEVOPS_SPECS, devops_registry
+from .devops import (
+    DEVOPS_EQUIVALENCE,
+    DEVOPS_GATES,
+    DEVOPS_SPECS,
+    devops_registry,
+)
 from .identity import IDENTITY_GATES, IDENTITY_SPECS, identity_registry
 from .ras_eval import RAS_EVAL_SPECS, ras_eval_registry
 from .saas import SAAS_GATES, SAAS_SPECS, saas_registry
@@ -87,7 +92,7 @@ EQUIVALENCES: dict[str, StateEquivalence | None] = {
     "workday": None,
     "cloud": None,
     "identity": None,
-    "devops": None,
+    "devops": DEVOPS_EQUIVALENCE,
     "database": None,
     "saas": None,
     "workstation": WORKSTATION_EQUIVALENCE,
