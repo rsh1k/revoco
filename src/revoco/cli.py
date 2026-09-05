@@ -296,6 +296,15 @@ def _cmd_surfaces(args: argparse.Namespace) -> int:
     print(f"  recoverable ONLY via snapshot      {s['snapshot_dependent']}")
     print(f"  may degrade for a given target     {s['degradable']}")
     print(f"  distinct gates to implement        {s['gates']}")
+    from .adapters.workspace import WORKSPACE_SPEC
+
+    print("  mechanisms (not tool-keyed, so not in the table above)")
+    print(
+        f"    workspace          snapshot-backed undo for an arbitrary shell "
+        f"command;\n                       {WORKSPACE_SPEC.inverse_tool}, drilled"
+    )
+    print()
+
     declared = [n for n, eq in EQUIVALENCES.items() if eq is not None]
     print(f"  surfaces with a declared equivalence {len(declared)}/{len(SURFACES)}")
     print()
