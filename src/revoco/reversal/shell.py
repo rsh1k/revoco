@@ -78,7 +78,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, NoReturn
 
-from .model import Reversibility
+from .model import InverseSpec, Reversibility
 
 
 @enum.unique
@@ -540,11 +540,17 @@ def command_classifier(
     root: str | None = None,
     shell_tools: frozenset[str] = DEFAULT_SHELL_TOOLS,
     command_arg: str = "command",
-) -> Callable[[str, dict[str, Any]], Reversibility | None]:
+) -> Callable[[str, dict[str, Any]], InverseSpec | None]:
     """Build a classifier the reversal engine can consult for shell tools.
 
     Returns ``None`` for anything that is not a shell tool, which leaves the
     engine's answer unchanged.
+
+    It returns an :class:`InverseSpec`, not a posture, and that is what keeps it
+    honest. A spec refuses to construct with an undoable kind and no undo path —
+    "kind=reversible requires an inverse_tool or steps" — so this cannot claim a
+    local write is recoverable while having nothing to run. The rule below is
+    enforced by the type rather than remembered.
 
     Why a local write stays UNKNOWN
     -------------------------------
@@ -554,16 +560,13 @@ def command_classifier(
     definition does not exist for a tool the registry has never heard of.
 
     An earlier version took a ``snapshots=True`` flag meaning "assume one will be
-    taken". It produced exactly the failure the paragraph above describes — the
-    horizon put the entry in `open_indefinitely` and counted it recoverable,
-    while ``reverse()`` answered *"bash is reversible; no inverse operation
-    exists"*. A boolean asserting that an undo exists somewhere is a declaration
-    without evidence, which is the one thing this package refuses to accept from
-    anyone else.
+    taken", and produced exactly that failure. Returning a spec makes the same
+    mistake impossible to write down.
 
-    So no posture returned here is ever undoable. Getting a local write to
-    REVERSIBLE honestly needs a snapshot mechanism registered as a spec, so the
-    plan carries a restore step that can actually run.
+    Getting a local write to REVERSIBLE honestly means giving this a snapshot
+    mechanism to name — an inverse tool and the fields to capture — at which
+    point the spec is constructible and the claim is backed by something that
+    runs.
 
     That leaves this worth wiring anyway. It moves ``ls`` out of UNKNOWN — which
     ranks below IRREVERSIBLE — and turns ``git push --force`` from an
@@ -571,7 +574,7 @@ def command_classifier(
     conversation with a policy.
     """
 
-    def classify_command(tool: str, args: dict[str, Any]) -> Reversibility | None:
+    def classify_command(tool: str, args: dict[str, Any]) -> InverseSpec | None:
         if tool not in shell_tools:
             return None
         command = args.get(command_arg)
@@ -579,12 +582,16 @@ def command_classifier(
             return None
         reach = classify(command, root).reach
         if reach is Reach.READ_ONLY:
-            return Reversibility.IDEMPOTENT
+            return InverseSpec(tool=tool, kind=Reversibility.IDEMPOTENT,
+                               notes="read-only shell command: nothing to undo")
         if reach is Reach.ESCAPES:
-            return Reversibility.IRREVERSIBLE
-        # LOCAL included: see the docstring. Nothing returned here is undoable,
-        # because nothing here can produce an inverse to run.
-        return Reversibility.UNKNOWN
+            return InverseSpec(tool=tool, kind=Reversibility.IRREVERSIBLE,
+                               notes="reaches beyond the working tree")
+        # LOCAL included: see the docstring. Without a snapshot mechanism to name
+        # there is no inverse, and UNKNOWN is the only kind that can be stated
+        # without one.
+        return InverseSpec(tool=tool, kind=Reversibility.UNKNOWN,
+                           notes="no snapshot mechanism configured")
 
     return classify_command
 

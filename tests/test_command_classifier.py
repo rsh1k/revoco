@@ -57,9 +57,42 @@ def test_a_classifier_that_raises_leaves_the_answer_unknown():
     assert _engine(classifier=boom).classify("bash", BASH) is Reversibility.UNKNOWN
 
 
-def test_a_classifier_returning_nonsense_is_ignored():
-    assert _engine(classifier=lambda t, a: "reversible").classify(
+@pytest.mark.parametrize("bogus", ["reversible", Reversibility.REVERSIBLE, 42, None])
+def test_a_classifier_returning_nonsense_is_ignored(bogus):
+    """A bare Reversibility is in this list deliberately: it is what the seam
+    used to accept, and accepting it again would reopen the hole."""
+    assert _engine(classifier=lambda t, a: bogus).classify(
         "bash", BASH) is Reversibility.UNKNOWN
+
+
+def test_the_seam_takes_a_spec_so_a_groundless_claim_cannot_be_written():
+    """The structural guarantee, replacing a rule that had to be remembered.
+
+    An earlier version returned a bare posture, which let a classifier answer
+    REVERSIBLE for a tool with no undo path — a plan the horizon counted as
+    recoverable while `reverse()` refused it. An InverseSpec will not construct
+    in that shape, so the mistake is now unrepresentable rather than tested for.
+    """
+    from revoco.core.errors import ValidationError
+
+    with pytest.raises(ValidationError, match="requires an inverse_tool or steps"):
+        InverseSpec(tool="bash", kind=Reversibility.REVERSIBLE)
+
+    # And a spec that does name one is honoured, undo path and all.
+    def snapshotting(tool, args):
+        return InverseSpec(tool=tool, kind=Reversibility.REVERSIBLE,
+                           inverse_tool="workspace.restore",
+                           arg_map=(("tree", "snapshot.tree"),),
+                           snapshot_fields=("tree",))
+
+    engine = ReversalEngine(
+        InverseRegistry([]), command_classifier=snapshotting,
+        state_reader=lambda t, a, f: {x: "sha123" for x in f})
+    plan = engine.plan("bash", {"command": "rm -rf build/"})
+    assert plan.kind is Reversibility.REVERSIBLE
+    assert plan.inverse_tool == "workspace.restore"
+    assert plan.snapshot == {"tree": "sha123"}
+    assert plan.is_executable, "a derived spec must travel the ordinary path"
 
 
 def test_no_classifier_at_all_behaves_as_before():
@@ -108,6 +141,7 @@ def test_no_posture_this_classifier_returns_is_ever_undoable(command):
     assert not kind.is_undoable, f"{command}: claims an undo with no inverse"
     assert plan.inverse_tool is None
     assert not plan.steps
+    assert not plan.is_executable
 
 
 # ---- the two derivations must agree ----------------------------------------
