@@ -112,7 +112,7 @@ class Reach(enum.Enum):
                 return 2
             case Reach.ESCAPES:
                 return 3
-        assert_never(self)
+        _unreachable(self)
 
     def worst(self, other: Reach) -> Reach:
         """The more severe of two reaches. Raises only."""
