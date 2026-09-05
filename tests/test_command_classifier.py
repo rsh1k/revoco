@@ -16,11 +16,11 @@ from revoco.reversal.shell import command_classifier
 BASH = {"command": "ls -la"}
 
 
-def _engine(*, specs=(), snapshots=False, classifier=None):
+def _engine(*, specs=(), classifier=None):
     return ReversalEngine(
         InverseRegistry(list(specs)),
         command_classifier=classifier if classifier is not None
-        else command_classifier(root="/repo", snapshots=snapshots),
+        else command_classifier(root="/repo"),
     )
 
 
@@ -78,15 +78,36 @@ def test_the_postures_that_cost_nothing_to_honour(command, expected):
     assert _engine().classify("bash", {"command": command}) is expected
 
 
-def test_a_local_write_stays_unknown_until_a_snapshot_exists():
-    """The honest part. `rm -rf build/` is recoverable *from a snapshot of the
-    working tree* — the snapshot is the inverse, and revoco does not take one.
-    Returning REVERSIBLE would produce a plan the horizon counts as recoverable
-    and `reverse()` refuses with "no inverse operation exists": a phantom
-    rollback manufactured by the classifier."""
-    cmd = {"command": "rm -rf build/"}
-    assert _engine(snapshots=False).classify("bash", cmd) is Reversibility.UNKNOWN
-    assert _engine(snapshots=True).classify("bash", cmd) is Reversibility.REVERSIBLE
+def test_a_local_write_stays_unknown_because_there_is_no_inverse_to_run():
+    """`rm -rf build/` is recoverable *from a snapshot of the working tree*. The
+    snapshot is the inverse, and this seam cannot supply one — it returns a
+    posture, and the undo path comes from a spec that does not exist for a tool
+    the registry has never heard of."""
+    assert _engine().classify(
+        "bash", {"command": "rm -rf build/"}) is Reversibility.UNKNOWN
+
+
+@pytest.mark.parametrize("command", [
+    "ls -la", "rm -rf build/", "git push --force origin main", "weird-cli go",
+    "mkdir out", "cd /tmp && rm -rf .", "echo x > f",
+])
+def test_no_posture_this_classifier_returns_is_ever_undoable(command):
+    """The invariant, asserted directly rather than case by case.
+
+    An undoable posture with no inverse is a phantom rollback: the horizon counts
+    the entry recoverable and `reverse()` answers "no inverse operation exists".
+    An earlier version took a `snapshots=True` flag meaning "assume one will be
+    taken" and produced exactly that — a declaration of an undo with nothing
+    behind it, which is the one thing this package refuses to accept from anyone
+    else. Any future posture added here has to pass this.
+    """
+    engine = _engine()
+    args = {"command": command}
+    kind = engine.classify("bash", args)
+    plan = engine.plan("bash", args)
+    assert not kind.is_undoable, f"{command}: claims an undo with no inverse"
+    assert plan.inverse_tool is None
+    assert not plan.steps
 
 
 # ---- the two derivations must agree ----------------------------------------

@@ -540,29 +540,34 @@ def command_classifier(
     root: str | None = None,
     shell_tools: frozenset[str] = DEFAULT_SHELL_TOOLS,
     command_arg: str = "command",
-    snapshots: bool = False,
 ) -> Callable[[str, dict[str, Any]], Reversibility | None]:
     """Build a classifier the reversal engine can consult for shell tools.
 
     Returns ``None`` for anything that is not a shell tool, which leaves the
     engine's answer unchanged.
 
-    ``snapshots`` is the honest part
-    --------------------------------
-    A LOCAL command — ``rm -rf build/`` — is recoverable *from a snapshot of the
-    working tree*. The snapshot is the inverse. revoco does not take one, so
-    without a provider there is no undo path, and returning REVERSIBLE would
-    produce a plan the horizon counts as recoverable and ``reverse()`` refuses
-    with "no inverse operation exists". That is a phantom rollback manufactured
-    by the classifier, which is precisely what this package exists to catch.
+    Why a local write stays UNKNOWN
+    -------------------------------
+    ``rm -rf build/`` is recoverable *from a snapshot of the working tree*. The
+    snapshot is the inverse, and this seam cannot supply one: it returns a
+    posture, and the undo path comes from an :class:`InverseSpec` that by
+    definition does not exist for a tool the registry has never heard of.
 
-    So LOCAL stays UNKNOWN until a caller says a snapshot will be taken. The
-    other three answers cost nothing to honour: READ_ONLY changed nothing, and
-    ESCAPES has no undo whether or not anyone snapshots.
+    An earlier version took a ``snapshots=True`` flag meaning "assume one will be
+    taken". It produced exactly the failure the paragraph above describes — the
+    horizon put the entry in `open_indefinitely` and counted it recoverable,
+    while ``reverse()`` answered *"bash is reversible; no inverse operation
+    exists"*. A boolean asserting that an undo exists somewhere is a declaration
+    without evidence, which is the one thing this package refuses to accept from
+    anyone else.
 
-    Even with ``snapshots=False`` this is worth wiring. It moves ``ls`` out of
-    UNKNOWN — which ranks below IRREVERSIBLE — and turns ``git push --force``
-    from an unclassified thing into a known one-way door, which is a different
+    So no posture returned here is ever undoable. Getting a local write to
+    REVERSIBLE honestly needs a snapshot mechanism registered as a spec, so the
+    plan carries a restore step that can actually run.
+
+    That leaves this worth wiring anyway. It moves ``ls`` out of UNKNOWN — which
+    ranks below IRREVERSIBLE — and turns ``git push --force`` from an
+    unclassified thing into a known one-way door, which is a different
     conversation with a policy.
     """
 
@@ -577,8 +582,8 @@ def command_classifier(
             return Reversibility.IDEMPOTENT
         if reach is Reach.ESCAPES:
             return Reversibility.IRREVERSIBLE
-        if reach is Reach.LOCAL:
-            return Reversibility.REVERSIBLE if snapshots else Reversibility.UNKNOWN
+        # LOCAL included: see the docstring. Nothing returned here is undoable,
+        # because nothing here can produce an inverse to run.
         return Reversibility.UNKNOWN
 
     return classify_command
