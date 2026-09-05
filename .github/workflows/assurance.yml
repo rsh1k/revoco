@@ -25,6 +25,41 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # One job per surface, because a run is comparable only against a baseline for
+  # the same target — `validation-report` refuses a cross-target comparison, on
+  # the grounds that the difference would be the targets rather than the controls.
+  workstation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install
+        run: uv sync --extra dev --extra yaml
+
+      # The world here is a temporary directory and a fresh `git init`, so this
+      # is not watching a remote system drift. It is watching *this runner*
+      # drift: a git release that changes what `reset --hard` or `stash pop`
+      # does would break an inverse, and nothing else in CI would say which one.
+      - name: Drill the workstation specs
+        run: uv run python scripts/validate_workstation.py --run-out run.json
+
+      - name: Compare against the committed baseline
+        run: |
+          uv run revoco validation-report run.json \
+            --previous assurance/workstation-baseline.json
+
+      - name: Keep the run
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: workstation-run-${{ github.run_id }}
+          path: run.json
+          retention-days: 90
+
   github-refs:
     runs-on: ubuntu-latest
     steps:

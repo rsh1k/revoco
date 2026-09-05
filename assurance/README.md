@@ -4,10 +4,21 @@ A drill says whether an inverse works now. A baseline is what turns a sequence o
 those into the only sentence that matters operationally: *this was working and it
 stopped.*
 
-`github-baseline.json` is a committed `ValidationRun` against the GitHub ref
-specs. The scheduled `assurance` workflow drills the same surface nightly and
-compares the result against it, failing when a control regressed or stopped
-being tested.
+Two baselines, one per validated surface:
+
+| Baseline | Target | What drift it watches |
+|---|---|---|
+| `github-baseline.json` | `github:OWNER/NAME` | The GitHub API changing under specs written from its documentation |
+| `workstation-baseline.json` | `workstation-local` | This runner changing — a git release that alters what `reset --hard` or `stash pop` does |
+
+One job per surface, because a run is comparable only against a baseline for the
+same target: `validation-report` refuses a cross-target comparison on the grounds
+that the difference would be the targets rather than the controls.
+
+The workstation drills already run in CI on every push, which tests the *code*.
+This is a different question. CI asks whether the change in front of it is
+correct; the assurance loop asks whether a control that worked last month still
+works, and answers with a date.
 
 ## Baselines are promoted by a person, never by CI
 
