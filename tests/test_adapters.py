@@ -430,3 +430,52 @@ def test_a_gate_must_explain_itself():
 
 def test_gate_round_trips():
     assert ReversalGate.from_dict(GATE_PERIOD_OPEN.to_dict()) == GATE_PERIOD_OPEN
+
+
+def test_workspace_is_deliberately_absent_from_the_catalogue() -> None:
+    """The workspace snapshot ships, but must not be listed as a surface.
+
+    SURFACES is keyed by fixed tool name. The workspace mechanism has no fixed
+    forward tool -- the shell classifier names it per call -- so listing it would
+    advertise ``workspace.guarded_command``, which nobody can invoke. This test
+    exists so that absence stays a decision: anyone "fixing" the omission by
+    adding a placeholder entry fails here and reads why.
+    """
+    from revoco.adapters import SURFACES, all_specs
+    from revoco.adapters.workspace import WORKSPACE_SPEC
+
+    # Anchor first: "not in" is satisfied by an empty catalogue, so prove the
+    # catalogue is populated before reading anything into the absence.
+    assert "devops" in SURFACES, "catalogue is empty; the absence below proves nothing"
+
+    # `workstation` is a real surface and `workspace` is the uncatalogued
+    # mechanism. The names are one letter apart and mean different things; the
+    # presence of the first is not evidence for the second.
+    assert "workstation" in SURFACES
+    assert "workspace" not in SURFACES
+    assert all(
+        spec.tool != WORKSPACE_SPEC.tool for spec in all_specs()
+    ), "the placeholder forward tool must never reach the catalogue"
+
+
+def test_surfaces_command_still_names_the_uncatalogued_mechanism() -> None:
+    """Excluding it from the table must not make it vanish from the CLI.
+
+    A reader who sees only the surface table would conclude the workspace undo
+    does not exist. The mechanism is named below the table; if that line is ever
+    dropped, the catalogue silently under-reports what is in the box.
+    """
+    import io
+    from contextlib import redirect_stdout
+
+    from revoco.adapters.workspace import WORKSPACE_SPEC
+    from revoco.cli import main
+
+    out = io.StringIO()
+    with redirect_stdout(out):
+        main(["surfaces"])
+    text = out.getvalue()
+
+    assert "workspace" in text
+    assert WORKSPACE_SPEC.inverse_tool in text, "name the operation that is real"
+    assert WORKSPACE_SPEC.tool not in text, "never advertise the placeholder"

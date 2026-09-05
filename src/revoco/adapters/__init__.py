@@ -70,6 +70,22 @@ from .workstation import (
 )
 
 # Surface name -> (specs, gates). Ordered roughly by blast radius.
+# `workspace` is deliberately absent from this map, and the absence is a decision
+# rather than an oversight.
+#
+# SURFACES enumerates specs by fixed tool name -- that is what makes `all_specs`,
+# `gate_catalog` and `revoco surfaces` meaningful. The workspace snapshot has no
+# fixed forward tool: the shell classifier fills the name in per call, because the
+# whole point is making an *arbitrary* command recoverable. Listing it here would
+# advertise `workspace.guarded_command`, a placeholder nobody can call, and
+# inflate the spec count with an operation that does not exist.
+#
+# It is still shipped, still drilled, and `revoco surfaces` names it below the
+# table so the catalogue does not quietly omit a mechanism that is in the box.
+#
+# Do not confuse it with the `workstation` surface below: one letter apart,
+# different things. `workstation` is tool-keyed and catalogued; `workspace` is
+# the snapshot mechanism and is not.
 SURFACES: dict[str, tuple[list[InverseSpec], tuple[ReversalGate, ...]]] = {
     "sap": (SAP_SPECS, SAP_GATES),
     "workday": (WORKDAY_SPECS, WORKDAY_GATES),
