@@ -73,9 +73,10 @@ import enum
 import os
 import re
 import shlex
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import NoReturn
+from typing import Any, NoReturn
 
 from .model import Reversibility
 
@@ -531,7 +532,60 @@ def _classify_simple(part: str, root: Path | None = None) -> Reach:
     return Reach.LOCAL if subcommands is not None else Reach.UNKNOWN
 
 
+DEFAULT_SHELL_TOOLS = frozenset({"bash", "sh", "zsh", "shell", "shell.run", "Bash"})
+
+
+def command_classifier(
+    *,
+    root: str | None = None,
+    shell_tools: frozenset[str] = DEFAULT_SHELL_TOOLS,
+    command_arg: str = "command",
+    snapshots: bool = False,
+) -> Callable[[str, dict[str, Any]], Reversibility | None]:
+    """Build a classifier the reversal engine can consult for shell tools.
+
+    Returns ``None`` for anything that is not a shell tool, which leaves the
+    engine's answer unchanged.
+
+    ``snapshots`` is the honest part
+    --------------------------------
+    A LOCAL command — ``rm -rf build/`` — is recoverable *from a snapshot of the
+    working tree*. The snapshot is the inverse. revoco does not take one, so
+    without a provider there is no undo path, and returning REVERSIBLE would
+    produce a plan the horizon counts as recoverable and ``reverse()`` refuses
+    with "no inverse operation exists". That is a phantom rollback manufactured
+    by the classifier, which is precisely what this package exists to catch.
+
+    So LOCAL stays UNKNOWN until a caller says a snapshot will be taken. The
+    other three answers cost nothing to honour: READ_ONLY changed nothing, and
+    ESCAPES has no undo whether or not anyone snapshots.
+
+    Even with ``snapshots=False`` this is worth wiring. It moves ``ls`` out of
+    UNKNOWN — which ranks below IRREVERSIBLE — and turns ``git push --force``
+    from an unclassified thing into a known one-way door, which is a different
+    conversation with a policy.
+    """
+
+    def classify_command(tool: str, args: dict[str, Any]) -> Reversibility | None:
+        if tool not in shell_tools:
+            return None
+        command = args.get(command_arg)
+        if not isinstance(command, str) or not command.strip():
+            return None
+        reach = classify(command, root).reach
+        if reach is Reach.READ_ONLY:
+            return Reversibility.IDEMPOTENT
+        if reach is Reach.ESCAPES:
+            return Reversibility.IRREVERSIBLE
+        if reach is Reach.LOCAL:
+            return Reversibility.REVERSIBLE if snapshots else Reversibility.UNKNOWN
+        return Reversibility.UNKNOWN
+
+    return classify_command
+
+
 __all__ = [
+    "DEFAULT_SHELL_TOOLS",
     "ESCAPE_PATTERNS",
     "LOCAL_WRITE_COMMANDS",
     "READ_ONLY_COMMANDS",
@@ -539,4 +593,5 @@ __all__ = [
     "Reach",
     "ShellVerdict",
     "classify",
+    "command_classifier",
 ]
