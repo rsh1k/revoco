@@ -75,7 +75,7 @@ import re
 import shlex
 from dataclasses import dataclass
 from pathlib import Path
-from typing import assert_never
+from typing import NoReturn
 
 from .model import Reversibility
 
@@ -310,6 +310,19 @@ class ShellVerdict:
     """Whether a snapshot must be taken before this runs."""
 
 
+def _unreachable(value: NoReturn) -> NoReturn:
+    """Exhaustiveness check that works on the Python versions this supports.
+
+    ``typing.assert_never`` arrived in 3.11 and this package supports 3.10 —
+    which the local interpreter could not reveal, because its stubs have the
+    symbol, so mypy passed here and failed in CI. Typing the parameter
+    ``NoReturn`` is the older idiom and gives the same static guarantee: a new
+    ``Reach`` member left unhandled below is a type error rather than a runtime
+    surprise.
+    """
+    raise AssertionError(f"unhandled reach: {value!r}")
+
+
 def _strip_heredocs(text: str) -> str:
     """Remove heredoc bodies, keeping the command line that introduced them.
 
@@ -406,7 +419,7 @@ def classify(command: str, root: str | None = None) -> ShellVerdict:
                 "would not reach it",
                 needs_snapshot=True,
             )
-    assert_never(worst)
+    _unreachable(worst)
 
 
 def _escapes_root(token: str, root: Path | None) -> bool:
