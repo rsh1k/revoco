@@ -104,6 +104,8 @@ class ReversalEngine:
         state_reader: StateReader | None = None,
         gate_evaluator: GateEvaluator | None = None,
         classify_hook: Callable[[str, Reversibility], Reversibility] | None = None,
+        command_classifier: Callable[[str, dict[str, Any]], Reversibility | None]
+        | None = None,
         on_event: EventSink | None = None,
     ) -> None:
         self.registry = registry or InverseRegistry()
@@ -113,6 +115,13 @@ class ReversalEngine:
         # declared posture that has no fresh drill evidence behind it — see
         # revoco.drills. Only ever downgrades.
         self.classify_hook = classify_hook
+        # Consulted only where the registry has no spec at all, so it can fill the
+        # UNKNOWN hole and can never contradict a declared one. That bound is what
+        # makes it safe to let it *raise* a posture, which `classify_hook`
+        # deliberately cannot: a hook runs at decision time and downgrades on
+        # missing proof, while this is a declaration of what a tool does and sits
+        # at exactly the trust level of the registry itself.
+        self.command_classifier = command_classifier
         self._emit = on_event or _noop_sink
         self._journal: dict[str, JournalEntry] = {}
         self._by_action: dict[str, str] = {}
@@ -134,7 +143,7 @@ class ReversalEngine:
         """
         spec = self.registry.get(tool)
         if spec is None:
-            return Reversibility.UNKNOWN
+            return self._classify_unspecified(tool, args)
         if args is None or not spec.authorize_gates:
             return self._apply_hook(tool, spec.kind)
         closed = self._closed_gates(
@@ -148,6 +157,26 @@ class ReversalEngine:
             )
             return self._apply_hook(tool, spec.degraded_kind)
         return self._apply_hook(tool, spec.kind)
+
+    def _classify_unspecified(
+        self, tool: str, args: dict[str, Any] | None
+    ) -> Reversibility:
+        """Posture for a tool the registry does not describe.
+
+        A shell command is the case this exists for: it is a string rather than a
+        name and arguments, so no spec can be written for it, and without this
+        every one of them is UNKNOWN — which ranks below IRREVERSIBLE here, so an
+        agent cannot run `ls` without failing every floor a policy states.
+        """
+        if self.command_classifier is None or args is None:
+            return Reversibility.UNKNOWN
+        try:
+            proposed = self.command_classifier(tool, args)
+        except Exception:
+            return Reversibility.UNKNOWN
+        if not isinstance(proposed, Reversibility):
+            return Reversibility.UNKNOWN
+        return proposed
 
     def _apply_hook(self, tool: str, kind: Reversibility) -> Reversibility:
         """Run the classify hook, refusing any result that would upgrade.
@@ -216,10 +245,12 @@ class ReversalEngine:
         created = now if now is not None else time.time()
 
         if spec is None:
+            # Same answer as `classify`, or the two disagree: the gate would judge
+            # one posture and the journal record another.
             return ReversalPlan(
                 id=new_plan_id(),
                 tool=tool,
-                kind=Reversibility.UNKNOWN,
+                kind=self._classify_unspecified(tool, args),
                 inverse_tool=None,
                 inverse_args={},
                 unresolved_args=(),
