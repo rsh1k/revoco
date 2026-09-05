@@ -53,6 +53,11 @@ from typing import Any
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
 from revoco.adapters import workstation_registry  # noqa: E402
+from revoco.adapters.workspace import (  # noqa: E402
+    WORKSPACE_SPEC,
+    restore_tree,
+    take_tree,
+)
 from revoco.adapters.workstation import WORKSTATION_EQUIVALENCE  # noqa: E402
 from revoco.drills import Canary, DrillOutcome, DrillRunner, RecoverabilityRegister  # noqa: E402
 
@@ -115,6 +120,11 @@ class RealWorkstation:
     def execute(self, tool: str, args: dict[str, Any]) -> Any:  # noqa: C901
         self.calls.append((tool, dict(args)))
 
+        if tool == "workspace.restore_tree":
+            return restore_tree(args["root"], args["tree"])
+        if tool == "shell.guarded":
+            return subprocess.run(args["command"], shell=True, cwd=self.repo,
+                                  capture_output=True, text=True).returncode
         if tool == "fs.noop":
             return None
         if tool == "fs.read_file":
@@ -196,6 +206,13 @@ class RealWorkstation:
         self, tool: str, args: dict[str, Any], fields: tuple[str, ...]
     ) -> dict[str, Any]:
         out: dict[str, Any] = {}
+        if tool == "shell.guarded":
+            # Capturing the tree here rather than in the canary is the point: the
+            # snapshot has to be taken by the control plane before the action, on
+            # the same path the real integration uses, or the drill would be
+            # proving a snapshot the plan never saw.
+            available = {"root": str(self.repo), "tree": take_tree(self.repo)}
+            return {f: available[f] for f in fields if f in available}
         if tool.startswith("fs.") and "path" in args:
             p = self._abs(args["path"])
             exists = p.exists()
@@ -294,6 +311,10 @@ def seed_sandbox(ws: RealWorkstation) -> None:
     (ws.repo / "history.txt").write_text("second\n")
     ws.git("add", "-A")
     ws.git("commit", "-q", "-m", "second")
+    (ws.repo / "src").mkdir(parents=True, exist_ok=True)
+    (ws.repo / "src" / "keep.txt").write_text("keep\n")
+    ws.git("add", "-A")
+    ws.git("commit", "-q", "-m", "workspace canary")
     ws.git("branch", "doomed")
     ws.git("branch", "sidebranch")
     # switch_with_stash needs a genuinely dirty tree: `git stash push` on a clean one
@@ -387,6 +408,21 @@ def build_canaries(ws: RealWorkstation) -> list[Canary]:
     ]
     # One declared relation for the surface, applied uniformly, instead of each
     # canary deciding for itself what "restored" is allowed to mean.
+    # The snapshot-backed inverse. Everything else on this surface has a
+    # purpose-built undo; this one is the general case — an arbitrary shell
+    # command made recoverable by capturing the tree first. It is the only
+    # inverse here whose correctness depends on a mechanism rather than on
+    # knowing what the command does, so it is the one most worth drilling.
+    def workspace_state():
+        return {"tree": take_tree(ws.repo)}
+
+    canaries.append(Canary(
+        tool="shell.guarded",
+        args={"command": "rm -rf src && echo new > created.txt",
+              "root": str(ws.repo)},
+        verify=workspace_state, label="workspace-snapshot",
+        equivalence=WORKSTATION_EQUIVALENCE))
+
     return [dataclasses.replace(c, equivalence=WORKSTATION_EQUIVALENCE) for c in canaries]
 
 
@@ -529,6 +565,8 @@ def main() -> int:
     root = Path(tempfile.mkdtemp(prefix="revoco-workstation-"))
     try:
         registry = workstation_registry()
+        registry.register(dataclasses.replace(
+            WORKSPACE_SPEC, tool="shell.guarded"))
         register = RecoverabilityRegister(stale_after=3600.0)
 
         # One sandbox per drill. The first version shared a single repo across all of

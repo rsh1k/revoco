@@ -1,15 +1,15 @@
 {
-  "finished_at": 1788613893.54142,
-  "id": "wsrun-1788613892",
+  "finished_at": 1788616730.1377065,
+  "id": "wsrun-1788616728",
   "results": [
     {
-      "at": 1788613893.1456778,
+      "at": 1788616729.2587025,
       "canary": "chmod",
       "collateral": [],
       "declared_kind": "reversible",
-      "duration_ms": 0.47,
+      "duration_ms": 0.65,
       "error": null,
-      "id": "drl_0e49abece7c8c958fb27fa4c",
+      "id": "drl_48d218a40deaee4f4668f8c0",
       "mismatches": [],
       "observed_residue": [],
       "outcome": "passed",
@@ -22,13 +22,13 @@
       "unrestored": []
     },
     {
-      "at": 1788613893.0848923,
+      "at": 1788616729.1259272,
       "canary": "delete-file",
       "collateral": [],
       "declared_kind": "compensable",
-      "duration_ms": 0.6,
+      "duration_ms": 1.05,
       "error": null,
-      "id": "drl_60b4506bbb4e945058c8946e",
+      "id": "drl_e9947cead79d6fa6347d531d",
       "mismatches": [],
       "observed_residue": [
         "mtime"
@@ -44,13 +44,13 @@
       "unrestored": []
     },
     {
-      "at": 1788613893.1727977,
+      "at": 1788616729.309488,
       "canary": "delete-tree",
       "collateral": [],
       "declared_kind": "compensable",
-      "duration_ms": 1.92,
+      "duration_ms": 2.14,
       "error": null,
-      "id": "drl_dcc3f6f9bd8ff657fc6e57a2",
+      "id": "drl_ca4023336ea3dec92fdffc9d",
       "mismatches": [],
       "observed_residue": [],
       "outcome": "passed",
@@ -63,13 +63,13 @@
       "unrestored": []
     },
     {
-      "at": 1788613893.1145787,
+      "at": 1788616729.1859963,
       "canary": "move",
       "collateral": [],
       "declared_kind": "reversible",
-      "duration_ms": 0.43,
+      "duration_ms": 0.73,
       "error": null,
-      "id": "drl_1f5deb732608d438a55e48b4",
+      "id": "drl_1afe5527dfe7e6e2a601c57e",
       "mismatches": [],
       "observed_residue": [],
       "outcome": "passed",
@@ -83,13 +83,13 @@
       "unrestored": []
     },
     {
-      "at": 1788613893.022977,
+      "at": 1788616728.9661727,
       "canary": "read",
       "collateral": [],
       "declared_kind": "idempotent",
-      "duration_ms": 0.02,
+      "duration_ms": 0.03,
       "error": null,
-      "id": "drl_f8fc90309bea78393078defe",
+      "id": "drl_0aa74c495f941fc5115040d7",
       "mismatches": [],
       "observed_residue": [],
       "outcome": "not_drillable",
@@ -100,13 +100,13 @@
       "unrestored": []
     },
     {
-      "at": 1788613893.0559146,
+      "at": 1788616729.0338757,
       "canary": "overwrite",
       "collateral": [],
       "declared_kind": "reversible",
-      "duration_ms": 1.0,
+      "duration_ms": 2.56,
       "error": null,
-      "id": "drl_494a3077cc32cc588997f0b8",
+      "id": "drl_ce5632040883461f893dfb88",
       "mismatches": [],
       "observed_residue": [
         "mtime"
@@ -121,13 +121,13 @@
       "unrestored": []
     },
     {
-      "at": 1788613893.2691913,
+      "at": 1788616729.4729908,
       "canary": "branch-delete",
       "collateral": [],
       "declared_kind": "reversible",
-      "duration_ms": 16.61,
+      "duration_ms": 24.12,
       "error": null,
-      "id": "drl_3695d840d0be2d31033d2904",
+      "id": "drl_34419cee068ddd32f86782a9",
       "mismatches": [],
       "observed_residue": [],
       "outcome": "passed",
@@ -140,13 +140,13 @@
       "unrestored": []
     },
     {
-      "at": 1788613893.3705893,
+      "at": 1788616729.704671,
       "canary": "checkout",
       "collateral": [],
       "declared_kind": "reversible",
-      "duration_ms": 19.26,
+      "duration_ms": 48.77,
       "error": null,
-      "id": "drl_bdaaf6116178a05de55d741a",
+      "id": "drl_dcb0490bd670c8c1b84c9315",
       "mismatches": [],
       "observed_residue": [],
       "outcome": "passed",
@@ -159,13 +159,13 @@
       "unrestored": []
     },
     {
-      "at": 1788613893.204862,
+      "at": 1788616729.36453,
       "canary": "commit",
       "collateral": [],
       "declared_kind": "reversible",
-      "duration_ms": 32.8,
+      "duration_ms": 36.14,
       "error": null,
-      "id": "drl_abcf95bc974eae9f0eafec7b",
+      "id": "drl_d309178bf60b558578a2679d",
       "mismatches": [],
       "observed_residue": [],
       "outcome": "passed",
@@ -178,13 +178,13 @@
       "unrestored": []
     },
     {
-      "at": 1788613893.3207257,
+      "at": 1788616729.572587,
       "canary": "reset-hard",
       "collateral": [],
       "declared_kind": "compensable",
-      "duration_ms": 21.37,
+      "duration_ms": 49.26,
       "error": null,
-      "id": "drl_d240253341903942c721ef4a",
+      "id": "drl_ec66501362d894420c23ca1b",
       "mismatches": [],
       "observed_residue": [],
       "outcome": "passed",
@@ -197,13 +197,13 @@
       "unrestored": []
     },
     {
-      "at": 1788613893.423125,
+      "at": 1788616729.822516,
       "canary": "switch-with-stash",
       "collateral": [],
       "declared_kind": "compensable",
-      "duration_ms": 30.22,
+      "duration_ms": 45.18,
       "error": null,
-      "id": "drl_b027627fa435f9a5c7c36f1f",
+      "id": "drl_b31d16bad4e5d39152ebd698",
       "mismatches": [],
       "observed_residue": [],
       "outcome": "passed",
@@ -215,8 +215,27 @@
       "tool": "git.switch_with_stash",
       "unavailable_reason": "",
       "unrestored": []
+    },
+    {
+      "at": 1788616729.9209988,
+      "canary": "workspace-snapshot",
+      "collateral": [],
+      "declared_kind": "reversible",
+      "duration_ms": 50.2,
+      "error": null,
+      "id": "drl_3ba6279c7a5077e8b1ab8c70",
+      "mismatches": [],
+      "observed_residue": [],
+      "outcome": "passed",
+      "residue": "Git-ignored files are not captured and do not come back: anything under an ignore rule \u2014 node_modules, .env, build output \u2014 is outside the snapshot. Nor is anything the command did beyond this directory.",
+      "restored": [
+        "tree"
+      ],
+      "tool": "shell.guarded",
+      "unavailable_reason": "",
+      "unrestored": []
     }
   ],
-  "started_at": 1788613892.9867866,
+  "started_at": 1788616728.894887,
   "target": "workstation-local"
 }

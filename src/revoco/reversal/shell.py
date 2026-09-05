@@ -69,6 +69,7 @@ is ``UNKNOWN``, because the text no longer tells you what will run.
 
 from __future__ import annotations
 
+import dataclasses
 import enum
 import os
 import re
@@ -540,6 +541,7 @@ def command_classifier(
     root: str | None = None,
     shell_tools: frozenset[str] = DEFAULT_SHELL_TOOLS,
     command_arg: str = "command",
+    local_spec: InverseSpec | None = None,
 ) -> Callable[[str, dict[str, Any]], InverseSpec | None]:
     """Build a classifier the reversal engine can consult for shell tools.
 
@@ -563,10 +565,11 @@ def command_classifier(
     taken", and produced exactly that failure. Returning a spec makes the same
     mistake impossible to write down.
 
-    Getting a local write to REVERSIBLE honestly means giving this a snapshot
-    mechanism to name — an inverse tool and the fields to capture — at which
-    point the spec is constructible and the claim is backed by something that
-    runs.
+    Pass ``local_spec`` to change that. It is the spec a LOCAL command gets, and
+    the obvious one is ``revoco.adapters.workspace.WORKSPACE_SPEC``, which names
+    a git tree object as the undo. Supplying it is a statement that the caller
+    has wired the matching reader and executor; supplying nothing leaves LOCAL
+    at UNKNOWN, which is the honest answer when no undo exists.
 
     That leaves this worth wiring anyway. It moves ``ls`` out of UNKNOWN — which
     ranks below IRREVERSIBLE — and turns ``git push --force`` from an
@@ -587,9 +590,11 @@ def command_classifier(
         if reach is Reach.ESCAPES:
             return InverseSpec(tool=tool, kind=Reversibility.IRREVERSIBLE,
                                notes="reaches beyond the working tree")
-        # LOCAL included: see the docstring. Without a snapshot mechanism to name
-        # there is no inverse, and UNKNOWN is the only kind that can be stated
-        # without one.
+        if reach is Reach.LOCAL and local_spec is not None:
+            # `dataclasses.replace` rather than a fresh construction, so the
+            # caller's residue, gates and window survive and only the tool name
+            # is filled in for this call.
+            return dataclasses.replace(local_spec, tool=tool)
         return InverseSpec(tool=tool, kind=Reversibility.UNKNOWN,
                            notes="no snapshot mechanism configured")
 

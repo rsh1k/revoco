@@ -40,6 +40,7 @@ revoco surfaces --gates     # what is covered, and every gate you must implement
 | `database` | 8 | Row writes, arbitrary SQL, schema migrations |
 | `saas` | 12 | Salesforce records, Slack messages, Stripe payments |
 | `workstation` | 14 | Filesystem, git, shell — what coding agents actually touch — **validated** |
+| `workspace` | 1 | A snapshot-backed inverse for an arbitrary shell command — **validated** |
 
 Two numbers from `revoco surfaces` are worth reporting upward:
 
