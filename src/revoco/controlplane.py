@@ -66,6 +66,7 @@ from .reversal.model import (
     CascadeReport,
     GateEvaluator,
     InverseExecutor,
+    InverseSpec,
     JournalEntry,
     JournalState,
     ReversalPlan,
@@ -173,6 +174,8 @@ class ControlPlane:
         inverse_registry: InverseRegistry | None = None,
         state_reader: StateReader | None = None,
         gate_evaluator: GateEvaluator | None = None,
+        command_classifier: Callable[[str, dict[str, Any]], InverseSpec | None]
+        | None = None,
         irreversibility_budget: IrreversibilityBudget | None = None,
         recoverability_register: Any | None = None,
         store: Any | None = None,
@@ -200,6 +203,14 @@ class ControlPlane:
             classify_hook=(
                 recoverability_register.classify_hook if recoverability_register else None
             ),
+            # Consulted only for tools the registry does not declare, so it fills
+            # the UNKNOWN hole without ever contradicting a declaration. There is
+            # deliberately no default: `revoco.reversal.shell.command_classifier`
+            # needs a root directory to decide what is inside the blast radius,
+            # and a guessed root would either refuse everything or, far worse,
+            # snapshot the wrong tree and call the result a restore. The caller
+            # names the root or gets no classifier.
+            command_classifier=command_classifier,
             on_event=self._on_reversal_event,
         )
         self.gate = PolicyEngine(
