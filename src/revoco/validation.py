@@ -196,6 +196,18 @@ def compare(current: ValidationRun,
             continue
 
         if cur.outcome is DrillOutcome.NOT_DRILLABLE:
+            # Only benign if it was never proving anything. A control that used to
+            # pass and now has nothing to prove has stopped being tested, which is
+            # the DISAPPEARED argument exactly -- and quieter, because the control
+            # is still listed. Reached by a spec being redeclared IDEMPOTENT, or by
+            # a classifier that stopped resolving, and neither should be silent.
+            if prev is not None and prev.outcome is not DrillOutcome.NOT_DRILLABLE:
+                out.append(ControlChange(
+                    tool, Change.REGRESSED, cur.outcome.value, prev.outcome.value,
+                    "was drilled in the previous run and has nothing to prove in "
+                    "this one; it is now untested, which is not the same as passing",
+                ))
+                continue
             out.append(ControlChange(tool, Change.NOT_DRILLABLE, cur.outcome.value,
                                      prev.outcome.value if prev else None))
             continue
