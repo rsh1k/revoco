@@ -76,6 +76,7 @@ from .reversal.engine import ReversalEngine
 from .reversal.model import (
     Exemption,
     InverseExecutor,
+    InverseSpec,
     Reversibility,
     StateEquivalence,
     StateReader,
@@ -317,16 +318,34 @@ class DrillRunner:
         executor: InverseExecutor,
         state_reader: StateReader | None = None,
         gate_evaluator: Any | None = None,
+        command_classifier: Callable[[str, dict[str, Any]], InverseSpec | None]
+        | None = None,
     ) -> None:
         self.registry = registry
         self.executor = executor
         self.state_reader = state_reader
         self.gate_evaluator = gate_evaluator
+        # Without this a canary whose spec is derived rather than declared is
+        # invisible to the runner, and an invisible spec reports NOT_DRILLABLE --
+        # "nothing here to prove", which is the wrong answer and a quiet one.
+        self.command_classifier = command_classifier
 
     def drill(self, canary: Canary, *, now: float | None = None) -> DrillResult:
         started = now if now is not None else time.time()
         clock = time.perf_counter()
-        spec = self.registry.get(canary.tool)
+        # A fresh engine per drill: journal state from one drill must not leak into
+        # the next, and it must never touch the production journal.
+        engine = ReversalEngine(
+            self.registry,
+            state_reader=self.state_reader,
+            gate_evaluator=self.gate_evaluator,
+            command_classifier=self.command_classifier,
+        )
+        # Ask the engine, not the registry. The registry only knows declared specs,
+        # so resolving here would silently skip every derived one -- and a drill
+        # that cannot see the thing it is meant to prove reports a clean pass by
+        # another name.
+        spec = engine.spec_for(canary.tool, canary.args)
         declared = spec.kind if spec else Reversibility.UNKNOWN
 
         def done(outcome: DrillOutcome, **kw: Any) -> DrillResult:
@@ -348,14 +367,6 @@ class DrillRunner:
         # a green result stood in for a test that never happened.
         if spec is None or not spec.kind.is_undoable:
             return done(DrillOutcome.NOT_DRILLABLE)
-
-        # A fresh engine per drill: journal state from one drill must not leak into
-        # the next, and it must never touch the production journal.
-        engine = ReversalEngine(
-            self.registry,
-            state_reader=self.state_reader,
-            gate_evaluator=self.gate_evaluator,
-        )
 
         try:
             before = dict(canary.verify() or {})

@@ -60,6 +60,7 @@ from revoco.adapters.workspace import (  # noqa: E402
 )
 from revoco.adapters.workstation import WORKSTATION_EQUIVALENCE  # noqa: E402
 from revoco.drills import Canary, DrillOutcome, DrillRunner, RecoverabilityRegister  # noqa: E402
+from revoco.reversal.shell import command_classifier  # noqa: E402
 
 
 # ---------------------------------------------------------------------------
@@ -564,9 +565,12 @@ def main() -> int:
     started = time.time()
     root = Path(tempfile.mkdtemp(prefix="revoco-workstation-"))
     try:
+        # The workspace spec is no longer registered by hand against a fixed tool
+        # name. It is supplied to the classifier as the spec a LOCAL command earns,
+        # so the drill below exercises the classifier's decision as well as the
+        # snapshot -- hand-registering proved only that restore_tree works, never
+        # that anything would choose it.
         registry = workstation_registry()
-        registry.register(dataclasses.replace(
-            WORKSPACE_SPEC, tool="shell.guarded"))
         register = RecoverabilityRegister(stale_after=3600.0)
 
         # One sandbox per drill. The first version shared a single repo across all of
@@ -586,6 +590,14 @@ def main() -> int:
                 executor=cell.execute,
                 state_reader=cell.read_state,
                 gate_evaluator=make_gate_evaluator(cell),
+                # Root is this drill's own sandbox: what counts as "inside the
+                # working tree" differs per cell, and a shared root would let one
+                # drill's reach analysis answer for another's tree.
+                command_classifier=command_classifier(
+                    root=str(cell.repo),
+                    local_spec=WORKSPACE_SPEC,
+                    shell_tools=frozenset({"shell.guarded"}),
+                ),
             )
             results.append(runner.drill(canary))
         register.record_all(results)
