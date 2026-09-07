@@ -216,3 +216,52 @@ def test_a_report_carries_the_previous_run_it_was_compared_against():
     rep = report(after, previous=before, signer_private_key=priv, signer_id="ci")
     assert rep.previous_id == "r1"
     assert rep.previous_digest == before.digest
+
+
+# ---- a control that stops proving anything, without leaving the suite -------
+
+ND = DrillOutcome.NOT_DRILLABLE
+
+
+def test_a_control_that_stops_being_drillable_is_a_regression():
+    """The quiet twin of DISAPPEARED, and the reason this was worth fixing.
+
+    `compare` checked the *current* outcome for NOT_DRILLABLE before consulting
+    the previous one, so a control that passed and then had nothing to prove
+    landed in the benign bucket. The suite printed "10/10 drills passed", the
+    report said "no control got worse", and the exit code was 0 -- while a drill
+    had silently stopped testing anything. Found by deleting a classifier and
+    watching a perfect score come back.
+    """
+    before = _run([_res("shell.guarded", P)], rid="r1")
+    after = _run([_res("shell.guarded", ND, at=2000.0)], rid="r2", at=2000.0)
+    (change,) = compare(after, before)
+    assert change.change is Change.REGRESSED
+    assert change.change.is_alarm
+    assert "untested" in (change.detail or "")
+
+
+def test_a_control_that_was_never_drillable_stays_benign():
+    """The bound: `fs.read_file` is IDEMPOTENT by design and must not alarm."""
+    before = _run([_res("fs.read_file", ND)], rid="r1")
+    after = _run([_res("fs.read_file", ND, at=2000.0)], rid="r2", at=2000.0)
+    (change,) = compare(after, before)
+    assert change.change is Change.NOT_DRILLABLE
+    assert not change.change.is_alarm
+
+
+def test_a_first_sighting_that_is_not_drillable_is_not_a_regression():
+    """No previous run means nothing was lost."""
+    after = _run([_res("fs.read_file", ND, at=2000.0)], rid="r2", at=2000.0)
+    (change,) = compare(after, None)
+    assert change.change is Change.NOT_DRILLABLE
+
+
+def test_the_report_leads_with_it_and_fails():
+    before = _run([_res("shell.guarded", P), _res("fs.chmod", P)], rid="r1")
+    after = _run([_res("shell.guarded", ND, at=2000.0),
+                  _res("fs.chmod", P, at=2000.0)], rid="r2", at=2000.0)
+    priv, _ = crypto.generate_keypair()
+    rep = report(after, previous=before, signer_private_key=priv, signer_id="ci")
+    assert rep.regressions, "a lost drill must reach the regressions list"
+    assert "REGRESSED" in render(rep)
