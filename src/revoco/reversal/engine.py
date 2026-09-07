@@ -78,6 +78,9 @@ EVT_EXECUTED = "reversal_executed"
 EVT_EXPIRED = "reversal_expired"
 EVT_GATE_BLOCKED = "reversal_gate_blocked"
 EVT_DEGRADED = "reversal_kind_degraded"
+# A seam that answered wrongly, rather than one that declined to answer. Both
+# leave the posture untouched, so without this they are the same silence.
+EVT_SEAM_FAILED = "reversal_seam_failed"
 
 
 def _noop_sink(kind: str, payload: dict[str, Any]) -> None:
@@ -150,7 +153,7 @@ class ReversalEngine:
         Passing no ``args`` skips authorize-phase evaluation and returns the
         spec's optimistic kind. Callers that gate on the answer should pass args.
         """
-        spec = self._spec_for(tool, args)
+        spec = self.spec_for(tool, args)
         if spec is None:
             return Reversibility.UNKNOWN
         if args is None or not spec.authorize_gates:
@@ -167,10 +170,16 @@ class ReversalEngine:
             return self._apply_hook(tool, spec.degraded_kind)
         return self._apply_hook(tool, spec.kind)
 
-    def _spec_for(
+    def spec_for(
         self, tool: str, args: dict[str, Any] | None
     ) -> InverseSpec | None:
         """The spec governing this call: declared, or derived for this one call.
+
+        Public because a caller outside the engine has the same question and must
+        not answer it by reading the registry directly. :class:`revoco.drills.
+        DrillRunner` did exactly that and so could never see a derived spec: a
+        classifier-backed command reported NOT_DRILLABLE, which reads as "there
+        is nothing here to prove" rather than "this runner cannot see it".
 
         A shell command is the case the classifier exists for. It is a string
         rather than a name and arguments, so no spec can be written for it ahead
@@ -188,9 +197,23 @@ class ReversalEngine:
             return None
         try:
             proposed = self.command_classifier(tool, args)
-        except Exception:
+        except Exception as exc:
+            # Swallowed on purpose -- a broken classifier must not take the call
+            # down -- but not silently. Returning None here is indistinguishable
+            # from "no opinion", and a classifier that raises on every call would
+            # otherwise look exactly like one that was never wired up.
+            self._emit(EVT_SEAM_FAILED, {
+                "seam": "command_classifier", "tool": tool,
+                "error": f"{type(exc).__name__}: {exc}",
+            })
             return None
-        return proposed if isinstance(proposed, InverseSpec) else None
+        if proposed is not None and not isinstance(proposed, InverseSpec):
+            self._emit(EVT_SEAM_FAILED, {
+                "seam": "command_classifier", "tool": tool,
+                "error": f"returned {type(proposed).__name__}, not an InverseSpec",
+            })
+            return None
+        return proposed
 
     def _apply_hook(self, tool: str, kind: Reversibility) -> Reversibility:
         """Run the classify hook, refusing any result that would upgrade.
@@ -203,9 +226,21 @@ class ReversalEngine:
             return kind
         try:
             proposed = self.classify_hook(tool, kind)
-        except Exception:
+        except Exception as exc:
+            self._emit(EVT_SEAM_FAILED, {
+                "seam": "classify_hook", "tool": tool,
+                "error": f"{type(exc).__name__}: {exc}",
+            })
             return kind
         if not isinstance(proposed, Reversibility) or proposed.rank > kind.rank:
+            self._emit(EVT_SEAM_FAILED, {
+                "seam": "classify_hook", "tool": tool,
+                "error": (
+                    f"refused: {proposed!r} would raise {kind.value}"
+                    if isinstance(proposed, Reversibility)
+                    else f"returned {type(proposed).__name__}, not a Reversibility"
+                ),
+            })
             return kind
         if proposed is not kind:
             self._emit(
@@ -255,7 +290,7 @@ class ReversalEngine:
         Never raises on an unknown tool — an unclassified tool yields an UNKNOWN
         plan, and it is policy's job to decide whether that is acceptable.
         """
-        spec = self._spec_for(tool, args)
+        spec = self.spec_for(tool, args)
         created = now if now is not None else time.time()
 
         if spec is None:
