@@ -31,7 +31,7 @@ Revoco merges three earlier tools and adds the layer none of them had:
 | [`mnemosyne`](https://github.com/rsh1k/mnemosyne) | A handful of obfuscation patterns — zero-width, Unicode-tag and bidi characters — and nothing more. Its memory gateway, trust-tier invariant, quarantine and drift baseline **did not move here** and have no equivalent in revoco |
 | **new here** | **The reversal layer: plan an undo *before* the action, execute it after, cascade it across a compromised grant's whole subtree** |
 
-All three remain maintained and Apache-2.0. Two things they still do that revoco does not: `mcp-gate` ships a **stdio MCP proxy**, so it can sit in front of Claude Code or Cursor where revoco has no MCP integration at all; and `mnemosyne` guards *what an agent remembers*, which is a different half of ASI06 from the actions revoco governs.
+All three remain maintained and Apache-2.0. One thing they still do that revoco does not: `mnemosyne` guards *what an agent remembers*, which is a different half of ASI06 from the actions revoco governs. The **stdio MCP proxy** did move here — `revoco.mcp.proxy` sits in front of Claude Code or Cursor and gates `tools/call` on recoverability, correlating JSON-RPC ids so an undo plan is confirmed against the real response rather than the request. See [docs/MCP.md](docs/MCP.md).
 
 ---
 
